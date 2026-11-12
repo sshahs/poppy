@@ -90,6 +90,10 @@ fun LoginScreen() {
                 g.settings.lastHomeserver = server.trim()
             } catch (t: Throwable) {
                 fail("Couldn't reach ${server.trim()}.", t)
+                val base = details
+                details = "$base\n\nRunning connection test…"
+                details = "$base\n\n" + runCatching { app.poppy.util.ConnectionDiagnostics.run(context, server) }
+                    .getOrElse { "Connection test failed: $it" }
             } finally {
                 busy = false
             }

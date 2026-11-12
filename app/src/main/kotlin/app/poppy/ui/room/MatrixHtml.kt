@@ -3,6 +3,7 @@ package app.poppy.ui.room
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.LinkAnnotation
+import androidx.compose.ui.text.ParagraphStyle
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextLinkStyles
 import androidx.compose.ui.text.buildAnnotatedString
@@ -12,6 +13,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.BaselineShift
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.em
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.text.withStyle
 
 data class HtmlColors(
     val link: Color,
@@ -38,6 +41,11 @@ object MatrixHtml {
     private val whitespace = Regex("\\s+")
     private val blockTags = setOf("p", "div", "ul", "ol", "li", "blockquote", "pre", "h1", "h2", "h3", "h4", "h5", "h6", "hr", "table", "tr", "details", "summary")
     private val voidTags = setOf("br", "hr", "img")
+    /** Blocks separated by a small gap; list items and divs only get a line break. */
+    private val gapTags = setOf("p", "ul", "ol", "blockquote", "pre", "h1", "h2", "h3", "h4", "h5", "h6", "table", "details")
+
+    /** Zero-width character carrying the spacer paragraph style. */
+    const val GAP = "\u200B"
 
     private class Open(val tag: String, val pushed: Int, val listIndex: IntArray? = null)
 
@@ -49,14 +57,30 @@ object MatrixHtml {
         val lists = ArrayList<IntArray>() // [-1] = unordered, else next number
 
         var last = '\n'
+        // Pending break before the next content: 0 none, 1 line break, 2 paragraph gap.
+        var pending = 0
+        fun flush() {
+            if (pending == 0) return
+            if (length > 0) {
+                if (pending == 2) {
+                    // A short spacer paragraph: visible separation without a full blank line.
+                    withStyle(ParagraphStyle(lineHeight = 7.sp)) { append(GAP) }
+                } else if (last != '\n') {
+                    append('\n')
+                }
+                last = '\n'
+            }
+            pending = 0
+        }
         fun put(t: String) {
             if (t.isEmpty()) return
+            flush()
             append(t)
             last = t[t.length - 1]
         }
-        fun atLineStart() = last == '\n'
-        fun newline() {
-            if (length > 0 && !atLineStart()) put("\n")
+        fun atLineStart() = last == '\n' || pending > 0 || length == 0
+        fun breakLine(gap: Boolean) {
+            if (length > 0) pending = maxOf(pending, if (gap) 2 else 1)
         }
 
         for (m in token.findAll(html)) {
@@ -95,7 +119,7 @@ object MatrixHtml {
                         "blockquote" -> quoteDepth--
                         "ul", "ol" -> if (lists.isNotEmpty()) lists.removeAt(lists.lastIndex)
                     }
-                    if (o.tag in blockTags) newline()
+                    if (o.tag in blockTags) breakLine(o.tag in gapTags && lists.isEmpty())
                 }
                 continue
             }
@@ -105,9 +129,9 @@ object MatrixHtml {
                 continue
             }
             if (name == "hr") {
-                newline()
+                breakLine(true)
                 put("───────────")
-                put("\n")
+                breakLine(true)
                 continue
             }
             if (name == "img") {
@@ -115,7 +139,7 @@ object MatrixHtml {
                 parseAttrs(attrs)["alt"]?.let { put(it) }
                 continue
             }
-            if (name in blockTags) newline()
+            if (name in blockTags) breakLine(name in gapTags && lists.isEmpty())
 
             var pushed = 0
             fun style(s: SpanStyle) {
@@ -204,7 +228,7 @@ object MatrixHtml {
 
     private fun AnnotatedString.trimEndNewlines(): AnnotatedString {
         var end = length
-        while (end > 0 && (text[end - 1] == '\n' || text[end - 1] == ' ')) end--
+        while (end > 0 && (text[end - 1] == '\n' || text[end - 1] == ' ' || text[end - 1] == '\u200B')) end--
         return if (end == length) this else subSequence(0, end)
     }
 

@@ -9,6 +9,13 @@ import org.junit.Test
 class MatrixHtmlTest {
     private val c = HtmlColors(Color.Blue, Color.Gray, Color.Gray, Color.Blue, Color.LightGray, Color.Red, Color.Yellow, Color.Black)
 
+    private val G = MatrixHtml.GAP
+
+    @Test
+    fun nestedListsStayTight() {
+        assertEquals("• a\n  • b\n• c", text("<ul><li>a<ul><li>b</li></ul></li><li>c</li></ul>"))
+    }
+
     private fun text(html: String) = MatrixHtml.render(html, c, "@me:example.org").text
 
     @Test
@@ -16,7 +23,7 @@ class MatrixHtmlTest {
         val html = "<p><strong>Las Vegas GP — Sunday 22 November.</strong> 🏎️</p>\n<ul>\n<li><strong>Race start: 04:00</strong> (Sunday)</li>\n" +
             "<li>That's 20:00 Saturday</li>\n</ul>\n<p>Qualifying is the night before.</p>\n"
         assertEquals(
-            "Las Vegas GP — Sunday 22 November. 🏎️\n• Race start: 04:00 (Sunday)\n• That's 20:00 Saturday\nQualifying is the night before.",
+            "Las Vegas GP — Sunday 22 November. 🏎️${G}• Race start: 04:00 (Sunday)\n• That's 20:00 Saturday${G}Qualifying is the night before.",
             text(html),
         )
     }
@@ -38,7 +45,7 @@ class MatrixHtmlTest {
 
     @Test
     fun preKeepsWhitespace() {
-        assertEquals("x\n  indented\ny", text("<p>x</p><pre><code>  indented</code></pre><p>y</p>"))
+        assertEquals("x$G  indented${G}y", text("<p>x</p><pre><code>  indented</code></pre><p>y</p>"))
     }
 
     @Test

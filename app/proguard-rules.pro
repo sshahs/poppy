@@ -5,7 +5,7 @@
 -keep class org.matrix.rustcomponents.sdk.** { *; }
 -keep class uniffi.** { *; }
 
-# --- TLS: rustls-platform-verifier is called from Rust via JNI by class/method name ---
+# --- TLS: Poppy's rustls-platform-verifier implementation is called from Rust via JNI by name ---
 -keep, includedescriptorclasses class org.rustls.platformverifier.** { *; }
 -keep class org.matrix.rustsdk.Android { *; }
 

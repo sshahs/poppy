@@ -112,7 +112,6 @@ composeCompiler {
 dependencies {
     implementation(libs.matrix.sdk)
     implementation(libs.jna) { artifact { type = "aar" } }
-    implementation(libs.rustls.platform.verifier)
     implementation(libs.unifiedpush)
 
     implementation(libs.coroutines.android)

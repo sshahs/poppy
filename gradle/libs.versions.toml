@@ -11,9 +11,6 @@ profileinstaller = "1.4.1"
 coil = "3.3.0"
 matrix-sdk = "26.10.23"
 jna = "5.18.1"
-# Must match the rustls-platform-verifier-android crate the Matrix SDK was built with
-# (rustls-platform-verifier 0.7.x -> 0.2.0). Re-check when bumping matrix-sdk.
-rustls-platform-verifier = "0.2.0"
 unifiedpush = "3.3.5"
 junit = "4.13.2"
 
@@ -35,7 +32,6 @@ coroutines-android = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-androi
 coil-compose = { module = "io.coil-kt.coil3:coil-compose", version.ref = "coil" }
 coil-gif = { module = "io.coil-kt.coil3:coil-gif", version.ref = "coil" }
 matrix-sdk = { module = "org.matrix.rustcomponents:sdk-android", version.ref = "matrix-sdk" }
-rustls-platform-verifier = { module = "org.rustls:rustls-platform-verifier", version.ref = "rustls-platform-verifier" }
 jna = { module = "net.java.dev.jna:jna", version.ref = "jna" }
 junit = { module = "junit:junit", version.ref = "junit" }
 unifiedpush = { module = "org.unifiedpush.android:connector", version.ref = "unifiedpush" }

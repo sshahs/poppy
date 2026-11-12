@@ -17,6 +17,11 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
+        // Android half of rustls-platform-verifier (used by the Matrix Rust SDK for TLS).
+        // It is only published to this GitHub-hosted Maven repository.
+        maven("https://raw.githubusercontent.com/rustls/rustls-platform-verifier/maven-archive/android-release-support/maven/") {
+            content { includeGroup("org.rustls") }
+        }
     }
 }
 

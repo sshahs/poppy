@@ -5,6 +5,10 @@
 -keep class org.matrix.rustcomponents.sdk.** { *; }
 -keep class uniffi.** { *; }
 
+# --- TLS: rustls-platform-verifier is called from Rust via JNI by class/method name ---
+-keep class org.rustls.platformverifier.** { *; }
+-keep class org.matrix.rustsdk.Android { *; }
+
 # --- UnifiedPush / Tink ---
 -dontwarn com.google.errorprone.annotations.**
 -dontwarn javax.annotation.**

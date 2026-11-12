@@ -44,6 +44,14 @@ class PoppyApp : Application(), SingletonImageLoader.Factory {
 
     private fun initRust() {
         try {
+            // JNA opens the library with dlopen, which the JVM can't see; load it through
+            // System.loadLibrary too so the JNI init symbol below can be resolved.
+            System.loadLibrary("matrix_sdk_ffi")
+            org.matrix.rustsdk.Android.init(this)
+        } catch (t: Throwable) {
+            Log.e("Poppy", "Failed to init TLS platform verifier", t)
+        }
+        try {
             initPlatform(
                 TracingConfiguration(
                     logLevel = if (BuildConfig.DEBUG) LogLevel.INFO else LogLevel.WARN,

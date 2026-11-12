@@ -1,0 +1,99 @@
+# Gitea Actions: build on every push to main, and build + publish + release on tags (v*).
+#
+# Requirements on the Gitea side (see README → "Releasing from Gitea"):
+#   * Actions enabled for the repository and an act_runner with the `ubuntu-latest` label.
+#   * Secrets: POPPY_KEYSTORE_BASE64, POPPY_KEYSTORE_PASSWORD, POPPY_KEY_ALIAS, POPPY_KEY_PASSWORD.
+#   * Optional secret RELEASE_TOKEN (a token with repo + package write scope). If unset the
+#     automatic job token is used, which can create releases on Gitea >= 1.21.
+#
+# Actions are referenced by full URL so this works regardless of DEFAULT_ACTIONS_URL.
+name: Android
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      POPPY_KEYSTORE_BASE64: ${{ secrets.POPPY_KEYSTORE_BASE64 }}
+      POPPY_KEYSTORE_PASSWORD: ${{ secrets.POPPY_KEYSTORE_PASSWORD }}
+      POPPY_KEY_ALIAS: ${{ secrets.POPPY_KEY_ALIAS }}
+      POPPY_KEY_PASSWORD: ${{ secrets.POPPY_KEY_PASSWORD }}
+    steps:
+      - uses: https://github.com/actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: https://github.com/actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - uses: https://github.com/android-actions/setup-android@v3
+
+      - name: Cache Gradle
+        uses: https://github.com/actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ hashFiles('gradle/libs.versions.toml', 'gradle/wrapper/gradle-wrapper.properties', '**/*.gradle.kts') }}
+          restore-keys: gradle-
+
+      - name: Version
+        run: ./scripts/ci-version.sh
+
+      - name: Signing
+        run: ./scripts/decode-keystore.sh
+
+      - name: Unit tests
+        run: ./gradlew --no-daemon testDebugUnitTest
+
+      - name: Assemble release APKs
+        run: ./gradlew --no-daemon assembleRelease
+
+      - name: Collect APKs
+        run: ./scripts/collect-apks.sh
+
+      # Gitea's artifact backend speaks the v3 protocol.
+      - uses: https://github.com/actions/upload-artifact@v3
+        with:
+          name: poppy-${{ env.POPPY_VERSION_NAME }}
+          path: dist/*
+
+      - name: Publish to Gitea package registry
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          TOKEN: ${{ secrets.RELEASE_TOKEN || github.token }}
+        run: |
+          set -euo pipefail
+          owner="${GITHUB_REPOSITORY%%/*}"
+          for f in dist/*; do
+            echo "Uploading $(basename "$f") to generic package poppy/${POPPY_VERSION_NAME}"
+            curl -fsS -X PUT -H "Authorization: token $TOKEN" --upload-file "$f" \
+              "${GITHUB_SERVER_URL}/api/packages/${owner}/generic/poppy/${POPPY_VERSION_NAME}/$(basename "$f")"
+          done
+
+      - name: Create Gitea release
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          TOKEN: ${{ secrets.RELEASE_TOKEN || github.token }}
+        run: |
+          set -euo pipefail
+          api="${GITHUB_SERVER_URL}/api/v1/repos/${GITHUB_REPOSITORY}"
+          notes="$(git log --pretty='- %s' "$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || git rev-list --max-parents=0 HEAD)"..HEAD | head -100)"
+          body="$(jq -n --arg tag "$GITHUB_REF_NAME" --arg name "Poppy ${POPPY_VERSION_NAME}" \
+                       --arg body "$notes" --argjson pre "${POPPY_PRERELEASE}" \
+                       '{tag_name:$tag, name:$name, body:$body, draft:false, prerelease:$pre}')"
+          id="$(curl -fsS -X POST -H "Authorization: token $TOKEN" -H 'Content-Type: application/json' \
+                 -d "$body" "$api/releases" | jq -r .id)"
+          for f in dist/*; do
+            echo "Attaching $(basename "$f")"
+            curl -fsS -X POST -H "Authorization: token $TOKEN" \
+              -F "attachment=@$f" "$api/releases/$id/assets?name=$(basename "$f")" > /dev/null
+          done
+          echo "Release ${GITHUB_REF_NAME} published: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/releases/tag/${GITHUB_REF_NAME}"

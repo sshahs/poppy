@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Poppy</string>
+    <string name="notification_channel_messages">Messages</string>
+    <string name="notification_channel_noisy">Mentions &amp; direct messages</string>
+    <string name="notification_channel_invites">Invites</string>
+    <string name="notification_channel_background">Background sync</string>
+</resources>

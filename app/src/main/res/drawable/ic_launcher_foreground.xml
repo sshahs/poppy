@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Poppy the Lakeland Terrier. Generated from art/poppy-foreground.svg -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <group
+        android:pivotX="54"
+        android:pivotY="56"
+        android:scaleX="0.78"
+        android:scaleY="0.78">
+        <path
+            android:pathData="M39,31 C33,30 26,32 23,36 C22,38 23,41 25,44 L31,55 C32,57 34,56 34,53 L36,42 Z"
+            android:fillColor="#1A1A1A" />
+        <path
+            android:pathData="M69,31 C75,30 82,32 85,36 C86,38 85,41 83,44 L77,55 C76,57 74,56 74,53 L72,42 Z"
+            android:fillColor="#1A1A1A" />
+        <path
+            android:pathData="M54,27 C64,27 72,31 74,38 L76,56 C77,62 78,68 80,73 L76,72 L78,78 L73,76 L73,82 L68,78 L66,85 L62,79 L58,86 L54,80 L50,86 L46,79 L42,85 L40,78 L35,82 L35,76 L30,78 L32,72 L28,73 C30,68 31,62 32,56 L34,38 C36,31 44,27 54,27 Z"
+            android:fillColor="#FFFFFF"
+            android:strokeColor="#1A1A1A"
+            android:strokeWidth="1.6"
+            android:strokeLineJoin="round" />
+        <path
+            android:pathData="M36,37 C38,30 45,27 54,27 C63,27 70,30 72,37 L69,36 L68,40 L65,37 L62,41 L59,37 L56,41 L54,37 L52,41 L49,37 L46,41 L43,37 L40,40 L39,36 Z"
+            android:fillColor="#1A1A1A" />
+        <path
+            android:pathData="M37.5,47.5 C38.5,43 43,41.5 47,42.5 C49.5,43 51.5,44.5 52,47 C48,45.6 42,45.8 37.5,47.5 Z"
+            android:fillColor="#E6E6E6"
+            android:strokeColor="#1A1A1A"
+            android:strokeWidth="1.1"
+            android:strokeLineJoin="round" />
+        <path
+            android:pathData="M70.5,47.5 C69.5,43 65,41.5 61,42.5 C58.5,43 56.5,44.5 56,47 C60,45.6 66,45.8 70.5,47.5 Z"
+            android:fillColor="#E6E6E6"
+            android:strokeColor="#1A1A1A"
+            android:strokeWidth="1.1"
+            android:strokeLineJoin="round" />
+        <path
+            android:pathData="M41.8,51.0 a3.2,3.4 0 1,0 6.4,0 a3.2,3.4 0 1,0 -6.4,0 Z"
+            android:fillColor="#1A1A1A" />
+        <path
+            android:pathData="M59.8,51.0 a3.2,3.4 0 1,0 6.4,0 a3.2,3.4 0 1,0 -6.4,0 Z"
+            android:fillColor="#1A1A1A" />
+        <path
+            android:pathData="M45.1,49.8 a1.0,1.0 0 1,0 2.0,0 a1.0,1.0 0 1,0 -2.0,0 Z"
+            android:fillColor="#FFFFFF" />
+        <path
+            android:pathData="M63.099999999999994,49.8 a1.0,1.0 0 1,0 2.0,0 a1.0,1.0 0 1,0 -2.0,0 Z"
+            android:fillColor="#FFFFFF" />
+        <path
+            android:pathData="M44,66 L41,72 M48,68 L46,75 M60,68 L62,75 M64,66 L67,72 M54,70 L54,77"
+            android:strokeColor="#9A9A9A"
+            android:strokeWidth="1"
+            android:strokeLineCap="round" />
+        <path
+            android:pathData="M48,58 C48,55.5 60,55.5 60,58 C60,61 57,63.5 54,63.5 C51,63.5 48,61 48,58 Z"
+            android:fillColor="#1A1A1A" />
+        <path
+            android:pathData="M50.5,57.3 a1.0,1.0 0 1,0 2.0,0 a1.0,1.0 0 1,0 -2.0,0 Z"
+            android:fillColor="#5A5A5A" />
+        <path
+            android:pathData="M54,63.5 L54,66 M54,66 C52,67.5 49.5,67.5 48,66 M54,66 C56,67.5 58.5,67.5 60,66"
+            android:strokeColor="#1A1A1A"
+            android:strokeWidth="1.3"
+            android:strokeLineCap="round" />
+    </group>
+</vector>

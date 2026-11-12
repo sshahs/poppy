@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.Poppy" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/poppy_background</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+    </style>
+    <!-- Shown while the process starts; swapped for Theme.Poppy in onCreate. -->
+    <style name="Theme.Poppy.Starting">
+        <item name="android:windowBackground">@color/poppy_background</item>
+    </style>
+</resources>

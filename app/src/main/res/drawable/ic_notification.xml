@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Monochrome Poppy silhouette for the status bar. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="72"
+    android:viewportHeight="72">
+    <group android:translateX="-18" android:translateY="-20">
+        <path android:fillColor="#FFFFFFFF" android:pathData="M39,31 C33,30 26,32 23,36 C22,38 23,41 25,44 L31,55 C32,57 34,56 34,53 L36,42 Z" />
+        <path android:fillColor="#FFFFFFFF" android:pathData="M69,31 C75,30 82,32 85,36 C86,38 85,41 83,44 L77,55 C76,57 74,56 74,53 L72,42 Z" />
+        <path android:fillColor="#FFFFFFFF" android:fillType="evenOdd" android:pathData="M54,27 C64,27 72,31 74,38 L76,56 C77,62 78,68 80,73 L76,72 L78,78 L73,76 L73,82 L68,78 L66,85 L62,79 L58,86 L54,80 L50,86 L46,79 L42,85 L40,78 L35,82 L35,76 L30,78 L32,72 L28,73 C30,68 31,62 32,56 L34,38 C36,31 44,27 54,27 Z M41.6,51 a3.4,3.6 0 1,0 6.8,0 a3.4,3.6 0 1,0 -6.8,0 Z M59.6,51 a3.4,3.6 0 1,0 6.8,0 a3.4,3.6 0 1,0 -6.8,0 Z M48,58 C48,55.5 60,55.5 60,58 C60,61 57,63.5 54,63.5 C51,63.5 48,61 48,58 Z" />
+    </group>
+</vector>

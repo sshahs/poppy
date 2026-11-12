@@ -6,6 +6,11 @@ on:
     tags: ["v*"]
   pull_request:
   workflow_dispatch:
+    inputs:
+      release_version:
+        description: "Create a release with this version (e.g. 0.1.0). Leave empty for a plain build."
+        required: false
+        default: ""
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -24,6 +29,8 @@ jobs:
       POPPY_KEYSTORE_PASSWORD: ${{ secrets.POPPY_KEYSTORE_PASSWORD }}
       POPPY_KEY_ALIAS: ${{ secrets.POPPY_KEY_ALIAS }}
       POPPY_KEY_PASSWORD: ${{ secrets.POPPY_KEY_PASSWORD }}
+      # Set when a release is requested from the Actions tab instead of by pushing a tag.
+      POPPY_RELEASE_TAG: ${{ inputs.release_version && format('v{0}', inputs.release_version) || '' }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -56,7 +63,7 @@ jobs:
       # Best-effort: tag builds publish to Releases instead, and a full artifact quota
       # must never fail the build.
       - uses: actions/upload-artifact@v4
-        if: ${{ !startsWith(github.ref, 'refs/tags/') }}
+        if: ${{ !startsWith(github.ref, 'refs/tags/') && env.POPPY_RELEASE_TAG == '' }}
         continue-on-error: true
         with:
           name: poppy-${{ env.POPPY_VERSION_NAME }}
@@ -65,9 +72,12 @@ jobs:
           if-no-files-found: error
 
       - name: Publish GitHub release
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: startsWith(github.ref, 'refs/tags/v') || env.POPPY_RELEASE_TAG != ''
         uses: softprops/action-gh-release@v2
         with:
+          # For manual releases this creates the tag on the commit that was built.
+          tag_name: ${{ env.POPPY_RELEASE_TAG || github.ref_name }}
+          target_commitish: ${{ github.sha }}
           name: Poppy ${{ env.POPPY_VERSION_NAME }}
           prerelease: ${{ env.POPPY_PRERELEASE == 'true' }}
           generate_release_notes: true

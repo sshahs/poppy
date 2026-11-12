@@ -239,6 +239,8 @@ git tag v0.1.0
 git push origin v0.1.0
 ```
 
+No terminal handy? Open **Actions → Android → Run workflow**, enter a version such as `0.2.0`, and the workflow builds, signs, creates the `v0.2.0` tag and publishes the release for you.
+
 ### 2b. Gitea
 
 `.gitea/workflows/android.yml` does the same on a Gitea instance:

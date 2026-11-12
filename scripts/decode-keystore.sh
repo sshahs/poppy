@@ -7,7 +7,7 @@ if [[ -n "${POPPY_KEYSTORE_BASE64:-}" ]]; then
   echo "$POPPY_KEYSTORE_BASE64" | base64 -d > "$path"
   echo "POPPY_KEYSTORE_PATH=$path" >> "$GITHUB_ENV"
   echo "Release keystore configured."
-elif [[ "${GITHUB_REF_TYPE:-}" == "tag" ]]; then
+elif [[ "${GITHUB_REF_TYPE:-}" == "tag" || -n "${POPPY_RELEASE_TAG:-}" ]]; then
   echo "::error::POPPY_KEYSTORE_BASE64 secret is missing; refusing to publish a debug-signed release."
   exit 1
 else

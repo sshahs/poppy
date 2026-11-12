@@ -6,8 +6,14 @@
 #   (no tag)    -> name 0.0.0-<sha>, code = run number
 set -euo pipefail
 
-ref="${GITHUB_REF_NAME:-}"
-if [[ "${GITHUB_REF_TYPE:-}" == "tag" && "$ref" =~ ^v([0-9]+)\.([0-9]+)\.([0-9]+)(.*)$ ]]; then
+# POPPY_RELEASE_TAG (manual "Run workflow" releases) takes precedence over the git ref.
+ref="${POPPY_RELEASE_TAG:-${GITHUB_REF_NAME:-}}"
+ref_type="$([[ -n "${POPPY_RELEASE_TAG:-}" ]] && echo tag || echo "${GITHUB_REF_TYPE:-}")"
+if [[ -n "${POPPY_RELEASE_TAG:-}" && ! "$POPPY_RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+ ]]; then
+  echo "::error::release_version must look like 1.2.3 (got '${POPPY_RELEASE_TAG#v}')"
+  exit 1
+fi
+if [[ "$ref_type" == "tag" && "$ref" =~ ^v([0-9]+)\.([0-9]+)\.([0-9]+)(.*)$ ]]; then
   name="${ref#v}"
   code=$(( BASH_REMATCH[1] * 10000 + BASH_REMATCH[2] * 100 + BASH_REMATCH[3] ))
   prerelease=$([[ -n "${BASH_REMATCH[4]}" ]] && echo true || echo false)

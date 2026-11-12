@@ -84,6 +84,7 @@ import app.poppy.ui.components.Avatar
 import app.poppy.ui.details.TextPrompt
 import app.poppy.util.copyToClipboard
 import app.poppy.util.errorMessage
+import app.poppy.util.shareLogs
 import app.poppy.util.toast
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -705,6 +706,12 @@ fun AboutScreen(nav: Navigator) {
             supportingContent = { Text("github.com/sshahs/poppy") },
             leadingContent = { Icon(Icons.Filled.Code, null) },
             modifier = Modifier.clickable { openUrl(context, "https://github.com/sshahs/poppy") },
+        )
+        ListItem(
+            headlineContent = { Text("Share debug logs") },
+            supportingContent = { Text("Send the last few days of SDK logs when reporting a problem") },
+            leadingContent = { Icon(Icons.Filled.Info, null) },
+            modifier = Modifier.clickable { context.shareLogs() },
         )
         ListItem(
             headlineContent = { Text("Matrix Rust SDK") },

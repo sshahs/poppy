@@ -20,6 +20,43 @@ fun errorMessage(t: Throwable): String = when (t) {
     else -> t.message ?: t.javaClass.simpleName
 }
 
+/** Full error chain for bug reports (the SDK puts the underlying cause in `details`). */
+fun errorDetails(t: Throwable): String = buildString {
+    when (t) {
+        is ClientException.MatrixApi -> {
+            append(t.msg).append("\ncode: ").append(t.code).append("\nkind: ").append(t.kind)
+            t.details?.let { append("\n").append(it) }
+        }
+        is ClientException.Generic -> {
+            append(t.msg)
+            t.details?.takeIf { it.isNotBlank() && it != t.msg }?.let { append("\n").append(it) }
+        }
+        else -> append(t.toString())
+    }
+    var cause = t.cause
+    while (cause != null) {
+        append("\ncaused by: ").append(cause)
+        cause = cause.cause
+    }
+}
+
+/** Shares the Rust SDK log files written by [app.poppy.PoppyApp]. */
+fun Context.shareLogs() {
+    val dir = File(filesDir, "logs")
+    val files = dir.listFiles()?.filter { it.isFile && it.length() > 0 }?.sortedByDescending { it.lastModified() }?.take(5).orEmpty()
+    if (files.isEmpty()) {
+        toast("No logs yet")
+        return
+    }
+    val uris = ArrayList(files.map { uriForFile(it) })
+    val intent = Intent(Intent.ACTION_SEND_MULTIPLE)
+        .setType("text/plain")
+        .putParcelableArrayListExtra(Intent.EXTRA_STREAM, uris)
+        .putExtra(Intent.EXTRA_SUBJECT, "Poppy debug logs")
+        .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    startActivity(Intent.createChooser(intent, "Share debug logs"))
+}
+
 fun Context.toast(text: String) = Toast.makeText(this, text, Toast.LENGTH_SHORT).show()
 
 fun Context.copyToClipboard(text: String, label: String = "Poppy") {

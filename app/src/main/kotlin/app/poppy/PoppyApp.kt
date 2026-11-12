@@ -28,11 +28,16 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import org.matrix.rustcomponents.sdk.LogLevel
 import org.matrix.rustcomponents.sdk.TracingConfiguration
+import org.matrix.rustcomponents.sdk.TracingFileConfiguration
 import org.matrix.rustcomponents.sdk.initPlatform
 
 class PoppyApp : Application(), SingletonImageLoader.Factory {
 
     lateinit var graph: AppGraph
+        private set
+
+    /** Set if the TLS verifier failed to initialise; surfaced in login error details. */
+    @Volatile var tlsInitError: String? = null
         private set
 
     override fun onCreate() {
@@ -50,15 +55,24 @@ class PoppyApp : Application(), SingletonImageLoader.Factory {
             org.matrix.rustsdk.Android.init(this)
         } catch (t: Throwable) {
             Log.e("Poppy", "Failed to init TLS platform verifier", t)
+            tlsInitError = t.toString()
         }
         try {
             initPlatform(
                 TracingConfiguration(
-                    logLevel = if (BuildConfig.DEBUG) LogLevel.INFO else LogLevel.WARN,
+                    // INFO while Poppy is in early testing: enough to diagnose network/TLS issues.
+                    logLevel = if (BuildConfig.DEBUG) LogLevel.DEBUG else LogLevel.INFO,
                     traceLogPacks = emptyList(),
                     extraTargets = emptyList(),
                     writeToStdoutOrSystem = true,
-                    writeToFiles = null,
+                    // Rotating on-disk logs so testers can share them (Settings → About).
+                    writeToFiles = TracingFileConfiguration(
+                        path = java.io.File(filesDir, "logs").apply { mkdirs() }.absolutePath,
+                        filePrefix = "poppy",
+                        fileSuffix = "log",
+                        maxTotalSizeBytes = 20UL * 1024UL * 1024UL,
+                        maxAgeSeconds = 3UL * 24UL * 3600UL,
+                    ),
                     sentryConfig = null,
                 ),
                 useLightweightTokioRuntime = false,

@@ -6,7 +6,7 @@
 -keep class uniffi.** { *; }
 
 # --- TLS: rustls-platform-verifier is called from Rust via JNI by class/method name ---
--keep class org.rustls.platformverifier.** { *; }
+-keep, includedescriptorclasses class org.rustls.platformverifier.** { *; }
 -keep class org.matrix.rustsdk.Android { *; }
 
 # --- UnifiedPush / Tink ---

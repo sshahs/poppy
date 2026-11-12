@@ -56,7 +56,11 @@ import androidx.compose.ui.unit.dp
 import app.poppy.R
 import app.poppy.core.LoginFlow
 import app.poppy.graph
+import app.poppy.util.copyToClipboard
+import app.poppy.util.errorDetails
 import app.poppy.util.errorMessage
+import app.poppy.util.shareLogs
+import app.poppy.util.toast
 import kotlinx.coroutines.launch
 
 @Composable
@@ -68,6 +72,13 @@ fun LoginScreen() {
     var flow by remember { mutableStateOf<LoginFlow?>(null) }
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
+    var details by remember { mutableStateOf<String?>(null) }
+    fun fail(prefix: String?, t: Throwable) {
+        error = listOfNotNull(prefix, errorMessage(t)).joinToString(" ")
+        val tls = (context.applicationContext as app.poppy.PoppyApp).tlsInitError
+        details = errorDetails(t) + (tls?.let { "\nTLS init: $it" } ?: "") +
+            "\n\nPoppy ${app.poppy.BuildConfig.VERSION_NAME}, Android ${android.os.Build.VERSION.RELEASE} (${android.os.Build.SUPPORTED_ABIS.firstOrNull()})"
+    }
 
     fun discover() {
         if (server.isBlank()) return
@@ -78,7 +89,7 @@ fun LoginScreen() {
                 flow = g.matrix.startLogin(server)
                 g.settings.lastHomeserver = server.trim()
             } catch (t: Throwable) {
-                error = "Couldn't reach ${server.trim()}. ${errorMessage(t)}"
+                fail("Couldn't reach ${server.trim()}.", t)
             } finally {
                 busy = false
             }
@@ -124,7 +135,7 @@ fun LoginScreen() {
                                     try {
                                         openBrowser(context, g.matrix.oauthUrl(f))
                                     } catch (t: Throwable) {
-                                        error = errorMessage(t)
+                                        fail(null, t)
                                     } finally {
                                         busy = false
                                     }
@@ -135,7 +146,7 @@ fun LoginScreen() {
                                     try {
                                         openBrowser(context, g.matrix.ssoUrl(f))
                                     } catch (t: Throwable) {
-                                        error = errorMessage(t)
+                                        fail(null, t)
                                     }
                                 }
                             },
@@ -146,7 +157,7 @@ fun LoginScreen() {
                                     try {
                                         g.matrix.loginWithPassword(f, user, pass)
                                     } catch (t: Throwable) {
-                                        error = errorMessage(t)
+                                        fail(null, t)
                                     } finally {
                                         busy = false
                                     }
@@ -164,6 +175,29 @@ fun LoginScreen() {
                     style = MaterialTheme.typography.bodyMedium,
                     modifier = Modifier.padding(top = 16.dp).widthIn(max = 460.dp),
                 )
+                details?.let { d ->
+                    var expanded by remember(d) { mutableStateOf(false) }
+                    Column(Modifier.widthIn(max = 460.dp).fillMaxWidth()) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                            TextButton(onClick = { expanded = !expanded }) { Text(if (expanded) "Hide details" else "Show details") }
+                            TextButton(onClick = {
+                                context.copyToClipboard(d, "Poppy error")
+                                context.toast("Copied")
+                            }) { Text("Copy") }
+                            TextButton(onClick = { context.shareLogs() }) { Text("Share logs") }
+                        }
+                        if (expanded) {
+                            androidx.compose.foundation.text.selection.SelectionContainer {
+                                Text(
+                                    d,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        }
+                    }
+                }
             }
             Spacer(Modifier.height(32.dp))
         }

@@ -53,10 +53,15 @@ jobs:
       - name: Collect APKs
         run: ./scripts/collect-apks.sh
 
+      # Best-effort: tag builds publish to Releases instead, and a full artifact quota
+      # must never fail the build.
       - uses: actions/upload-artifact@v4
+        if: ${{ !startsWith(github.ref, 'refs/tags/') }}
+        continue-on-error: true
         with:
           name: poppy-${{ env.POPPY_VERSION_NAME }}
           path: dist/*
+          retention-days: 7
           if-no-files-found: error
 
       - name: Publish GitHub release

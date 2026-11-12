@@ -103,6 +103,8 @@ fun RoomListScreen(session: MatrixSession, nav: Navigator) {
     val rooms by session.rooms.rooms.collectAsState()
     val loaded by session.rooms.loaded.collectAsState()
     val filter by session.rooms.filter.collectAsState()
+    val spaces by session.spaces.spaces.collectAsState()
+    val selectedSpace by session.rooms.space.collectAsState()
     val syncing by session.syncIndicator.collectAsState()
     val profile by session.profile.collectAsState()
     val verification by session.verificationState.collectAsState()
@@ -113,6 +115,7 @@ fun RoomListScreen(session: MatrixSession, nav: Navigator) {
     var actionsFor by remember { mutableStateOf<RoomSummary?>(null) }
     var showJoin by remember { mutableStateOf(false) }
     val listState = rememberLazyListState()
+    androidx.activity.compose.BackHandler(enabled = selectedSpace != null) { session.rooms.setSpace(null) }
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
 
     // Infinite scrolling of the sliding-sync window.
@@ -158,7 +161,7 @@ fun RoomListScreen(session: MatrixSession, nav: Navigator) {
                     )
                 } else {
                     TopAppBar(
-                        title = { Text("Chats", fontWeight = FontWeight.SemiBold) },
+                        title = { Text(selectedSpace?.name ?: "Chats", fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                         navigationIcon = {
                             IconButton(onClick = { nav.push(Screen.Settings) }) {
                                 Avatar(profile.avatarUrl, profile.displayName ?: profile.userId, profile.userId, 34.dp)
@@ -204,6 +207,9 @@ fun RoomListScreen(session: MatrixSession, nav: Navigator) {
         ) {
             item(key = "banner", contentType = "banner") {
                 SecurityBanner(verification, recovery) { nav.push(Screen.Security) }
+            }
+            if (spaces.isNotEmpty()) item(key = "spaces", contentType = "spaces") {
+                SpaceStrip(spaces, selectedSpace, onSelect = { session.rooms.setSpace(it) }, onBrowse = { nav.push(Screen.Space(it.id)) })
             }
             item(key = "filters", contentType = "filters") {
                 LazyRow(

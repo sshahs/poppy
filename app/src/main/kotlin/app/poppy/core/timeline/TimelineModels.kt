@@ -48,6 +48,8 @@ data class MessageEntry(
     val status: SendStatus,
     val threadReplies: Int,
     val readBy: Int,
+    /** The message mentions us (intentional mentions or @room); shown highlighted. */
+    val mentionsMe: Boolean = false,
     /** True when this message continues a run from the same sender (no header/avatar). */
     val groupedWithPrevious: Boolean = false,
     /** True when the next message is from the same sender (tighter bottom corner). */
@@ -69,11 +71,29 @@ sealed interface MessageBody {
         val mimeType: String?,
         val filename: String,
         val isSticker: Boolean = false,
+        val caption: String? = null,
     ) : MessageBody
-    data class Video(override val plain: String, val source: MediaSource, val thumbnail: MediaSource?, val width: Int, val height: Int, val durationMs: Long, val mimeType: String?, val filename: String) : MessageBody
-    data class Audio(override val plain: String, val source: MediaSource, val durationMs: Long, val mimeType: String?, val filename: String, val isVoice: Boolean) : MessageBody
-    data class File(override val plain: String, val source: MediaSource, val size: Long, val mimeType: String?, val filename: String) : MessageBody
-    data class Location(override val plain: String, val geoUri: String) : MessageBody
+    data class Video(override val plain: String, val source: MediaSource, val thumbnail: MediaSource?, val width: Int, val height: Int, val durationMs: Long, val mimeType: String?, val filename: String, val caption: String? = null) : MessageBody
+    data class Audio(
+        override val plain: String,
+        val source: MediaSource,
+        val durationMs: Long,
+        val mimeType: String?,
+        val filename: String,
+        val isVoice: Boolean,
+        val waveform: List<Float> = emptyList(),
+        val caption: String? = null,
+    ) : MessageBody
+    data class File(override val plain: String, val source: MediaSource, val size: Long, val mimeType: String?, val filename: String, val caption: String? = null) : MessageBody
+    data class Gallery(override val plain: String, val caption: String?, val items: List<GalleryItem>) : MessageBody
+    data class Location(
+        override val plain: String,
+        val geoUri: String,
+        val isLive: Boolean = false,
+        /** Epoch ms when a live share ends (0 for static locations). */
+        val liveUntil: Long = 0,
+        val updatedAt: Long = 0,
+    ) : MessageBody
     data class Poll(
         override val plain: String,
         val question: String,
@@ -87,6 +107,28 @@ sealed interface MessageBody {
     data class Encrypted(override val plain: String = "Waiting for this message") : MessageBody
     data class Unsupported(override val plain: String) : MessageBody
 }
+
+@Immutable
+data class GalleryItem(
+    val source: MediaSource,
+    val thumbnail: MediaSource?,
+    val width: Int,
+    val height: Int,
+    val isVideo: Boolean,
+    val filename: String,
+    val mimeType: String?,
+)
+
+/** True for media bodies that carry a user-written caption. */
+val MessageBody.mediaCaption: String?
+    get() = when (this) {
+        is MessageBody.Image -> caption
+        is MessageBody.Video -> caption
+        is MessageBody.Audio -> caption
+        is MessageBody.File -> caption
+        is MessageBody.Gallery -> caption
+        else -> null
+    }
 
 @Immutable
 data class PollOption(val id: String, val text: String, val votes: Int, val mine: Boolean)

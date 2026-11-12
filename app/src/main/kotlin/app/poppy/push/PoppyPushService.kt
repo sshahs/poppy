@@ -27,6 +27,10 @@ class PoppyPushService : PushService() {
         val eventId = notification.optString("event_id").takeIf { it.isNotEmpty() }
         val unread = notification.optJSONObject("counts")?.optInt("unread", -1) ?: -1
         val g = applicationContext.graph
+        if (g.push.onPushReceived(roomId)) {
+            g.notifications.showTest()
+            return
+        }
         if (roomId == null || eventId == null) {
             // Count-only push (e.g. read on another device): clear when nothing is unread.
             if (unread == 0) g.notifications.clearAll()

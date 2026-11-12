@@ -28,7 +28,7 @@ data class Distributor(val packageName: String, val label: String)
 sealed interface PushStatus {
     data object NotConfigured : PushStatus
     data object Registering : PushStatus
-    data class Registered(val distributor: String, val gateway: String) : PushStatus
+    data class Registered(val distributor: String, val gateway: String, val warning: String? = null) : PushStatus
     data class Failed(val reason: String) : PushStatus
     data object Polling : PushStatus
 }
@@ -58,7 +58,6 @@ class PushManager(private val context: Context, private val graph: AppGraph) {
 
     fun select(packageName: String) {
         _status.value = PushStatus.Registering
-        setPolling(false)
         UnifiedPush.saveDistributor(context, packageName)
         UnifiedPush.register(context, INSTANCE, "Poppy", null)
     }
@@ -79,7 +78,9 @@ class PushManager(private val context: Context, private val graph: AppGraph) {
         when {
             distributor != null -> {
                 val gw = settings.pushGateway
-                _status.value = if (settings.pushEndpoint != null && gw != null) PushStatus.Registered(label(distributor), gw) else PushStatus.Registering
+                val ep = settings.pushEndpoint
+                _status.value = if (ep != null && gw != null) PushStatus.Registered(label(distributor), gw, webPushWarning(ep)) else PushStatus.Registering
+                if (settings.pollingEnabled) schedulePolling()
                 // Re-register every launch: distributors may rotate endpoints.
                 UnifiedPush.register(context, INSTANCE, "Poppy", null)
             }
@@ -108,11 +109,88 @@ class PushManager(private val context: Context, private val graph: AppGraph) {
             )
             settings.pushEndpoint = endpoint
             settings.pushGateway = gateway
-            _status.value = PushStatus.Registered(label(currentDistributor()), gateway)
+            _status.value = PushStatus.Registered(label(currentDistributor()), gateway, webPushWarning(endpoint))
         } catch (t: Throwable) {
             Log.e(TAG, "Failed to register pusher", t)
             _status.value = PushStatus.Failed(t.message ?: "Could not register with the homeserver")
         }
+    }
+
+    /**
+     * Matrix homeservers send plain JSON through the gateway. Push services built on Mozilla's
+     * autopush (e.g. Sunup) only accept RFC 8291-encrypted, VAPID-signed Web Push, so they reject
+     * those requests until homeservers implement MSC4174 (Web Push pushers).
+     */
+    private fun webPushWarning(endpoint: String): String? {
+        val host = runCatching { URL(endpoint).host }.getOrNull() ?: return null
+        return if (WEB_PUSH_ONLY_HOSTS.any { host == it || host.endsWith(".$it") }) {
+            "This distributor uses encrypted Web Push (Mozilla autopush). Matrix homeservers can't send that yet, " +
+                "so notifications won't arrive. Use ntfy or NextPush instead, or turn on background polling."
+        } else {
+            null
+        }
+    }
+
+    private var testWaiter: kotlinx.coroutines.CompletableDeferred<Unit>? = null
+
+    /**
+     * End-to-end check of distributor → push server → gateway, without the homeserver: posts a
+     * fake Matrix notification to the gateway and waits for it to come back through the distributor.
+     * Returns a human-readable result.
+     */
+    suspend fun sendTestPush(): String {
+        val endpoint = settings.pushEndpoint ?: return "Push isn't registered yet. Pick a distributor first."
+        val gateway = settings.pushGateway ?: DEFAULT_GATEWAY
+        val waiter = kotlinx.coroutines.CompletableDeferred<Unit>().also { testWaiter = it }
+        val body = JSONObject().put(
+            "notification",
+            JSONObject()
+                .put("event_id", TEST_EVENT_ID)
+                .put("room_id", TEST_ROOM_ID)
+                .put("counts", JSONObject().put("unread", 1))
+                .put("prio", "high")
+                .put(
+                    "devices",
+                    org.json.JSONArray().put(
+                        JSONObject().put("app_id", context.packageName).put("pushkey", endpoint).put("pushkey_ts", 0).put("data", JSONObject()),
+                    ),
+                ),
+        ).toString()
+        val gatewayResult = withContext(Dispatchers.IO) {
+            runCatching {
+                val conn = (URL(gateway).openConnection() as HttpURLConnection).apply {
+                    requestMethod = "POST"
+                    doOutput = true
+                    connectTimeout = 10_000
+                    readTimeout = 10_000
+                    setRequestProperty("Content-Type", "application/json")
+                }
+                conn.outputStream.use { it.write(body.toByteArray()) }
+                val code = conn.responseCode
+                val text = (if (code < 400) conn.inputStream else conn.errorStream)?.bufferedReader()?.use { it.readText() }.orEmpty()
+                code to text
+            }
+        }
+        val (code, text) = gatewayResult.getOrElse { return "Couldn't reach the push gateway ($gateway): ${it.message}" }
+        if (code >= 400) return "The push gateway refused the test (HTTP $code): $text"
+        if (text.contains(endpoint)) {
+            return "The push server rejected the message for your endpoint." + (webPushWarning(endpoint)?.let { "\n\n$it" } ?: "")
+        }
+        val arrived = kotlinx.coroutines.withTimeoutOrNull(20_000) { waiter.await() } != null
+        testWaiter = null
+        return if (arrived) {
+            "Push works: the test notification came back through your distributor."
+        } else {
+            "The gateway accepted the test but it never reached this phone. Check that your distributor app is " +
+                "connected and allowed to run in the background." + (webPushWarning(endpoint)?.let { "\n\n$it" } ?: "")
+        }
+    }
+
+    /** Returns true if this push was our self-test (and consumes it). */
+    fun onPushReceived(roomId: String?): Boolean {
+        if (roomId != TEST_ROOM_ID) return false
+        testWaiter?.complete(Unit)
+        return true
     }
 
     fun onRegistrationFailed(reason: String) {
@@ -160,6 +238,12 @@ class PushManager(private val context: Context, private val graph: AppGraph) {
             context.getSystemService(JobScheduler::class.java).cancel(PollingJobService.JOB_ID)
             if (_status.value == PushStatus.Polling) _status.value = PushStatus.NotConfigured
         }
+        if (enabled && currentDistributor() != null) {
+            // Polling runs alongside push as a safety net; keep showing the push status.
+            val ep = settings.pushEndpoint
+            val gw = settings.pushGateway
+            if (ep != null && gw != null) _status.value = PushStatus.Registered(label(currentDistributor()), gw, webPushWarning(ep))
+        }
     }
 
     private fun schedulePolling() {
@@ -180,5 +264,8 @@ class PushManager(private val context: Context, private val graph: AppGraph) {
         private const val TAG = "PushManager"
         const val INSTANCE = "default"
         const val DEFAULT_GATEWAY = "https://matrix.gateway.unifiedpush.org/_matrix/push/v1/notify"
+        private const val TEST_ROOM_ID = "!poppy-push-test:poppy"
+        private const val TEST_EVENT_ID = "\$poppy-push-test"
+        private val WEB_PUSH_ONLY_HOSTS = listOf("push.services.mozilla.com")
     }
 }

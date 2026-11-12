@@ -178,6 +178,19 @@ class NotificationRenderer(private val context: Context, private val graph: AppG
         manager.notify(SUMMARY_ID, n)
     }
 
+    fun showTest() {
+        if (!canPost()) return
+        val n = NotificationCompat.Builder(context, CH_MESSAGES)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setColor(ContextCompat.getColor(context, R.color.poppy_red))
+            .setContentTitle("Poppy")
+            .setContentText("Push notifications are working \uD83D\uDC3E")
+            .setAutoCancel(true)
+            .build()
+        @Suppress("MissingPermission")
+        manager.notify(TEST_ID, n)
+    }
+
     fun clearRoom(roomId: String) {
         history.remove(roomId)
         manager.cancel(TAG_ROOM, roomId.hashCode())
@@ -258,6 +271,7 @@ class NotificationRenderer(private val context: Context, private val graph: AppG
         private const val TAG_ROOM = "room"
         private const val TAG_INVITE = "invite"
         private const val SUMMARY_ID = 1
+        private const val TEST_ID = 2
         private const val MAX_LINES = 8
     }
 }

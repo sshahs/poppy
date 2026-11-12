@@ -41,8 +41,14 @@ class TimelineMapper(private val ownUserId: String) {
             return StateEntry(key, text, e.timestamp.toLong())
         }
         val msgLike = content.content
+        var mentionsMe = false
         val (body, edited) = when (val kind = msgLike.kind) {
-            is MsgLikeKind.Message -> mapMessage(kind.content.msgType) to kind.content.isEdited
+            is MsgLikeKind.Message -> {
+                val m = kind.content.mentions
+                mentionsMe = (m != null && (m.room || ownUserId in m.userIds)) ||
+                    (m == null && kind.content.body.contains(ownUserId))
+                mapMessage(kind.content.msgType) to kind.content.isEdited
+            }
             is MsgLikeKind.Sticker -> MessageBody.Image(
                 plain = kind.body,
                 source = kind.source,
@@ -118,6 +124,7 @@ class TimelineMapper(private val ownUserId: String) {
             status = status,
             threadReplies = msgLike.threadSummary?.numReplies()?.toInt() ?: 0,
             readBy = e.readReceipts.keys.count { it != e.sender },
+            mentionsMe = mentionsMe && !e.isOwn,
         )
     }
 
@@ -148,6 +155,7 @@ class TimelineMapper(private val ownUserId: String) {
             height = type.content.info?.height?.toInt() ?: 0,
             mimeType = type.content.info?.mimetype,
             filename = type.content.filename,
+            caption = type.content.caption,
         )
         is MessageType.Video -> MessageBody.Video(
             plain = type.content.caption ?: type.content.filename,
@@ -158,14 +166,17 @@ class TimelineMapper(private val ownUserId: String) {
             durationMs = type.content.info?.duration?.toMillis() ?: 0,
             mimeType = type.content.info?.mimetype,
             filename = type.content.filename,
+            caption = type.content.caption,
         )
         is MessageType.Audio -> MessageBody.Audio(
             plain = type.content.caption ?: type.content.filename,
             source = type.content.source,
-            durationMs = type.content.info?.duration?.toMillis() ?: 0,
             mimeType = type.content.info?.mimetype,
             filename = type.content.filename,
             isVoice = type.content.voice != null,
+            waveform = type.content.audio?.waveform?.map { (it.toFloat() / 1024f).coerceIn(0f, 1f) }.orEmpty(),
+            caption = type.content.caption,
+            durationMs = (type.content.info?.duration ?: type.content.audio?.duration)?.toMillis() ?: 0,
         )
         is MessageType.File -> MessageBody.File(
             plain = type.content.caption ?: type.content.filename,
@@ -173,6 +184,26 @@ class TimelineMapper(private val ownUserId: String) {
             size = type.content.info?.size?.toLong() ?: 0,
             mimeType = type.content.info?.mimetype,
             filename = type.content.filename,
+            caption = type.content.caption,
+        )
+        is MessageType.Gallery -> MessageBody.Gallery(
+            plain = type.content.body,
+            caption = type.content.body.takeIf { it.isNotBlank() },
+            items = type.content.itemtypes.mapNotNull { item ->
+                when (item) {
+                    is org.matrix.rustcomponents.sdk.GalleryItemType.Image -> GalleryItem(
+                        item.content.source, item.content.info?.thumbnailSource,
+                        item.content.info?.width?.toInt() ?: 0, item.content.info?.height?.toInt() ?: 0,
+                        false, item.content.filename, item.content.info?.mimetype,
+                    )
+                    is org.matrix.rustcomponents.sdk.GalleryItemType.Video -> GalleryItem(
+                        item.content.source, item.content.info?.thumbnailSource,
+                        item.content.info?.width?.toInt() ?: 0, item.content.info?.height?.toInt() ?: 0,
+                        true, item.content.filename, item.content.info?.mimetype,
+                    )
+                    else -> null
+                }
+            },
         )
         is MessageType.Location -> MessageBody.Location(type.content.body, type.content.geoUri)
         else -> MessageBody.Text(Formatter.messageBody(type), null, TextKind.NOTICE, false)

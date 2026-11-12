@@ -43,6 +43,7 @@ class MatrixSession(
 
     val rooms = RoomListRepository(scope)
     val verification = VerificationManager(client, scope)
+    val spaces = SpacesRepository()
 
     private val _syncState = MutableStateFlow(SyncServiceState.IDLE)
     val syncState: StateFlow<SyncServiceState> = _syncState
@@ -106,6 +107,7 @@ class MatrixSession(
         }
         rooms.attach(rls)
         initialised = true
+        scope.launch { spaces.attach(client) }
         scope.launch { runCatching { verification.attach() }.onFailure { Log.w(TAG, "verification", it) } }
     }
 
@@ -136,6 +138,7 @@ class MatrixSession(
         handles.forEach { runCatching { it.cancel() } }
         handles.clear()
         rooms.close()
+        spaces.close()
         verification.close()
     }
 

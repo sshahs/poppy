@@ -180,6 +180,7 @@ private fun MainContent(session: MatrixSession, nav: Navigator) {
                 Screen.StartChat -> StartChatScreen(session, nav)
                 Screen.CreateRoom -> CreateRoomScreen(session, nav)
                 Screen.Explore -> ExploreScreen(session, nav)
+                is Screen.Space -> app.poppy.ui.rooms.SpaceScreen(session, screen.spaceId, nav)
                 Screen.Settings -> SettingsScreen(session, nav)
                 Screen.Security -> SecurityScreen(session, nav)
                 Screen.Verification -> VerificationScreen(session, nav)

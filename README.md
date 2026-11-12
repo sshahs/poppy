@@ -40,7 +40,7 @@
 | ⚡ **Fast** | Sliding sync (MSC4186) with the battle-tested **Matrix Rust SDK** core, a lean Jetpack Compose UI, R8 full optimisation, per-ABI APKs and uncompressed, memory-mapped native libraries for quick cold starts. |
 | 🔐 **Private** | End-to-end encryption by default, encrypted local stores (the SDK store cipher with a random per-account passphrase), session tokens sealed with an Android Keystore AES-256-GCM key, no analytics, no crash reporters, no Google Play Services. |
 | 📱 **Native** | 100 % Kotlin + Material 3 Compose. Edge-to-edge, predictive back, Material You (optional), themed monochrome icon, conversation notifications with direct reply. |
-| 🔔 **Push without Google** | [UnifiedPush](https://unifiedpush.org) — works with [Sunup](https://codeberg.org/Sunup/android), [ntfy](https://ntfy.sh), NextPush and friends. No distributor? A battery-aware background-sync fallback kicks in. |
+| 🔔 **Push without Google** | [UnifiedPush](https://unifiedpush.org) via [ntfy](https://ntfy.sh), NextPush and friends, with a built-in end-to-end push test. No distributor? A battery-aware background-sync fallback kicks in. |
 
 ## Features
 
@@ -55,15 +55,20 @@
 - Session refresh tokens, soft-logout handling, encrypted on-disk session storage
 
 **Chats**
+- **Spaces**: switch between spaces from the chat list, browse a space's rooms and subspaces and join them
 - Room list with **unread / mentions / people / rooms / favourites / invites** filters and fuzzy search
 - Accept or decline **invites** inline; mark read/unread, favourite and leave from a long-press
 - Timeline with **day dividers, unread marker, grouping, read ticks**, infinite back-pagination
 - **Markdown** composer (`/me`, `/shrug`, `/plain`), **replies** (incl. swipe-to-reply), **edits**, **redactions**
+- **Mentions**: `@` autocomplete for members and `@room`, intentional mentions, pills, and highlighted messages that mention you
+- **Voice messages**: record (Opus/Ogg) with a live waveform, inline playback with seekable waveform
 - **Reactions** (quick bar + emoji picker), **pinning**, copy/share/permalinks
-- **HTML formatted messages** rendered natively, linkified plain text, emoji-only jumbo messages
-- **Images, stickers & GIFs** (animated), **video**, **audio & voice messages**, **files**, **locations**
+- **HTML formatted messages** via a compact native renderer (lists, quotes, code, colours, spoilers), linkified plain text, emoji-only jumbo messages, inline timestamps
+- **Images, stickers & GIFs** (animated), **video**, **audio**, **files**
+- **Media captions** (add while sending, edit later) and **galleries / albums** (send several photos as one message)
+- **Location**: send your current location or **share live location** for 15 min / 1 h / 8 h (Google-free, via Android's own location service)
 - **Polls** — create, vote, live results, end
-- **Attachments**: multi-select photo/video picker and document picker, uploads stream from disk
+- **Attachments**: multi-select photo/video picker and document picker with a preview sheet, uploads stream from disk
 - **Typing notifications**, read receipts (or private receipts), composer **drafts** that persist
 - Full-screen pinch-zoom image viewer with **save to Downloads** and **share**
 - **Share into Poppy** from any app; open **matrix.to** and **`matrix:`** links
@@ -90,13 +95,10 @@
 Matrix is a big protocol and Poppy is young. Planned next, roughly in order:
 
 - [ ] Threads view (thread summaries are shown today)
-- [ ] Spaces navigation (spaces are hidden from the chat list today)
 - [ ] Voice/video calls (Element Call / MatrixRTC)
 - [ ] Message search (the Rust SDK search index)
 - [ ] Device management list & sign out other sessions
-- [ ] Mentions/pills autocomplete in the composer, rich text editor
-- [ ] Voice message recording, media captions & galleries
-- [ ] Live location sharing
+- [ ] Map previews for locations, rich text editor
 - [ ] Multi-account switching (storage already supports several accounts)
 - [ ] Translations
 
@@ -106,9 +108,11 @@ Contributions are very welcome!
 
 Poppy never talks to Google. Instead it uses **UnifiedPush**, an open standard where *you* pick the app that holds the push connection:
 
-1. Install a distributor, e.g. **[Sunup](https://codeberg.org/Sunup/android)** (uses Mozilla's push servers, zero setup) or **[ntfy](https://ntfy.sh)** (self-hostable). More at [unifiedpush.org](https://unifiedpush.org/users/distributors/).
-2. In Poppy open **Settings → Notifications** and select it.
+1. Install a distributor, e.g. **[ntfy](https://ntfy.sh)** (self-hostable) or NextPush. More at [unifiedpush.org](https://unifiedpush.org/users/distributors/).
+2. In Poppy open **Settings → Notifications**, select it, and tap **Send test notification** to check the whole path end-to-end.
 3. Poppy registers the endpoint with your homeserver through a Matrix push gateway — your distributor's own, if it provides one, otherwise `matrix.gateway.unifiedpush.org`.
+
+> **Sunup and other Web Push–only distributors don't work with Matrix yet.** They sit on Mozilla's push service, which only accepts encrypted, VAPID-signed Web Push. Matrix homeservers currently send plain JSON through the gateway, so the push service rejects it. This needs homeserver support for Web Push pushers ([MSC4174](https://github.com/matrix-org/matrix-spec-proposals/pull/4174)). Poppy detects this and warns you; use ntfy, or enable background polling as a fallback.
 
 Pushes only carry `event_id_only` payloads; message content is fetched and **decrypted on your device**.
 

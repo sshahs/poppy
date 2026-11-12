@@ -14,6 +14,9 @@ import org.matrix.rustcomponents.sdk.DateDividerMode
 import org.matrix.rustcomponents.sdk.EditedContent
 import org.matrix.rustcomponents.sdk.EventOrTransactionId
 import org.matrix.rustcomponents.sdk.FileInfo
+import org.matrix.rustcomponents.sdk.GalleryItemInfo
+import org.matrix.rustcomponents.sdk.GalleryUploadParameters
+import org.matrix.rustcomponents.sdk.Mentions
 import org.matrix.rustcomponents.sdk.ImageInfo
 import org.matrix.rustcomponents.sdk.PollKind
 import org.matrix.rustcomponents.sdk.ReceiptType
@@ -182,14 +185,45 @@ class RoomTimeline(val room: Room, ownUserId: String, private val privateReceipt
         }
     }
 
-    fun sendText(markdown: String, replyToEventId: String?, emote: Boolean = false) = launchCatching {
+    fun sendText(markdown: String, replyToEventId: String?, emote: Boolean = false, mentions: Mentions? = null) = launchCatching {
         val tl = timeline ?: return@launchCatching
-        val content = if (emote) messageEventContentFromMarkdownAsEmote(markdown) else messageEventContentFromMarkdown(markdown)
+        var content = if (emote) messageEventContentFromMarkdownAsEmote(markdown) else messageEventContentFromMarkdown(markdown)
+        // Always attach intentional mentions (MSC3952); an empty set stops accidental pings.
+        content = content.withMentions(mentions ?: Mentions(emptyList(), false))
         if (replyToEventId != null) tl.sendReply(content, replyToEventId) else tl.send(content)
     }
 
-    fun edit(id: EventOrTransactionId, markdown: String) = launchCatching {
-        timeline?.edit(id, EditedContent.RoomMessage(messageEventContentFromMarkdown(markdown)))
+    fun edit(id: EventOrTransactionId, markdown: String, mentions: Mentions? = null) = launchCatching {
+        val content = messageEventContentFromMarkdown(markdown).withMentions(mentions ?: Mentions(emptyList(), false))
+        timeline?.edit(id, EditedContent.RoomMessage(content))
+    }
+
+    fun editCaption(id: EventOrTransactionId, caption: String) = launchCatching {
+        timeline?.edit(id, EditedContent.MediaCaption(caption.ifBlank { null }, null, null))
+    }
+
+    /** Several photos/videos as one gallery message (MSC4274). */
+    fun sendGallery(items: List<app.poppy.util.PickedFile>, caption: String?, replyTo: String?) = launchCatching {
+        val infos = items.map { f ->
+            val src = UploadSource.File(f.file.absolutePath)
+            if (f.mime.startsWith("video/")) {
+                GalleryItemInfo.Video(
+                    VideoInfo(java.time.Duration.ofMillis(f.durationMs), f.height.toULong(), f.width.toULong(), f.mime, f.size.toULong(), null, null, null),
+                    src, null, null, null, null,
+                )
+            } else {
+                GalleryItemInfo.Image(
+                    ImageInfo(f.height.toULong(), f.width.toULong(), f.mime, f.size.toULong(), null, null, null, f.mime == "image/gif"),
+                    src, null, null, null, null,
+                )
+            }
+        }
+        timeline?.sendGallery(GalleryUploadParameters(caption?.takeIf { it.isNotBlank() }, null, null, replyTo), infos)?.join()
+    }
+
+    fun sendVoice(path: String, mime: String, durationMs: Long, size: Long, waveform: List<Float>, replyTo: String?) = launchCatching {
+        val info = AudioInfo(duration = java.time.Duration.ofMillis(durationMs), size = size.toULong(), mimetype = mime)
+        timeline?.sendVoiceMessage(params(path, "Voice message.${path.substringAfterLast('.')}", null, replyTo), info, waveform)?.join()
     }
 
     fun sendImage(path: String, filename: String, mime: String, width: Int, height: Int, size: Long, caption: String?, replyTo: String?) = launchCatching {

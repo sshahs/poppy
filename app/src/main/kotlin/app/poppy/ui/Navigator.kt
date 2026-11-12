@@ -16,6 +16,7 @@ sealed interface Screen {
     data object StartChat : Screen { override val key = "start-chat" }
     data object CreateRoom : Screen { override val key = "create-room" }
     data object Explore : Screen { override val key = "explore" }
+    data class Space(val spaceId: String) : Screen { override val key = "space/$spaceId" }
     data object Settings : Screen { override val key = "settings" }
     data object Security : Screen { override val key = "security" }
     data object Verification : Screen { override val key = "verification" }

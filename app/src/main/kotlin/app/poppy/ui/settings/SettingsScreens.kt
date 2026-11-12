@@ -523,12 +523,33 @@ fun NotificationSettingsScreen(session: MatrixSession, nav: Navigator) {
             style = MaterialTheme.typography.bodyMedium,
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
         )
+        (status as? PushStatus.Registered)?.warning?.let { warning ->
+            Card(Modifier.padding(horizontal = 16.dp, vertical = 4.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)) {
+                Text(warning, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onErrorContainer, modifier = Modifier.padding(12.dp))
+            }
+        }
+        if (current != null) {
+            var testing by remember { mutableStateOf(false) }
+            var testResult by remember { mutableStateOf<String?>(null) }
+            Row(Modifier.padding(horizontal = 16.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                OutlinedButton(enabled = !testing, onClick = {
+                    testing = true
+                    testResult = null
+                    scope.launch {
+                        testResult = g.push.sendTestPush()
+                        testing = false
+                    }
+                }) { Text(if (testing) "Testing…" else "Send test notification") }
+                if (testing) CircularProgressIndicator(Modifier.padding(start = 12.dp).size(18.dp), strokeWidth = 2.dp)
+            }
+            testResult?.let { Text(it, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)) }
+        }
         if (distributors.isEmpty()) {
             Card(Modifier.padding(16.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)) {
                 Column(Modifier.padding(16.dp)) {
                     Text("No UnifiedPush distributor found", fontWeight = FontWeight.SemiBold)
                     Text(
-                        "Poppy doesn't use Google. For instant, battery-friendly push install a UnifiedPush distributor such as Sunup or ntfy, then come back here.",
+                        "Poppy doesn't use Google. For instant, battery-friendly push install a UnifiedPush distributor such as ntfy (works with every Matrix server today), then come back here.",
                         style = MaterialTheme.typography.bodySmall,
                         modifier = Modifier.padding(vertical = 8.dp),
                     )
@@ -547,7 +568,6 @@ fun NotificationSettingsScreen(session: MatrixSession, nav: Navigator) {
                 modifier = Modifier.clickable {
                     g.push.select(d.packageName)
                     current = d.packageName
-                    polling = false
                 },
             )
         }
@@ -561,9 +581,9 @@ fun NotificationSettingsScreen(session: MatrixSession, nav: Navigator) {
         }
         ListItem(
             headlineContent = { Text("Background polling") },
-            supportingContent = { Text("Fallback when no distributor is installed. Uses more battery and is delayed.") },
+            supportingContent = { Text("Checks for messages every ~15 minutes. Use it when you have no distributor, or as a safety net alongside one. Uses a little more battery.") },
             trailingContent = {
-                Switch(polling, enabled = current == null, onCheckedChange = {
+                Switch(polling, onCheckedChange = {
                     polling = it
                     g.push.setPolling(it)
                 })

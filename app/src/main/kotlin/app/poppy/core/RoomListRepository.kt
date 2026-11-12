@@ -71,6 +71,10 @@ class RoomListRepository(private val scope: CoroutineScope) {
 
     private var query: String = ""
 
+    private val _space = MutableStateFlow<SpaceUi?>(null)
+    /** The space the chat list is narrowed to, or null for everything. */
+    val space: StateFlow<SpaceUi?> = _space
+
     private val entries = ArrayList<Pair<Room, RoomSummary>>()
     private val updates = Channel<List<RoomListEntriesUpdate>>(Channel.UNLIMITED)
 
@@ -115,6 +119,11 @@ class RoomListRepository(private val scope: CoroutineScope) {
         applyFilter()
     }
 
+    fun setSpace(space: SpaceUi?) {
+        _space.value = space
+        applyFilter()
+    }
+
     fun setQuery(text: String) {
         query = text.trim()
         applyFilter()
@@ -139,6 +148,7 @@ class RoomListRepository(private val scope: CoroutineScope) {
             RoomFilter.INVITES -> base += RoomListEntriesDynamicFilterKind.Invite
         }
         if (query.isNotEmpty()) base += RoomListEntriesDynamicFilterKind.FuzzyMatchRoomName(query)
+        _space.value?.let { base += RoomListEntriesDynamicFilterKind.Identifiers(it.roomIds) }
         runCatching { controller?.setFilter(RoomListEntriesDynamicFilterKind.All(base)) }
     }
 

@@ -24,6 +24,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Archive
+import androidx.compose.material.icons.automirrored.filled.ManageSearch
+import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.MarkEmailRead
 import androidx.compose.material.icons.filled.AlternateEmail
 import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.Close
@@ -168,7 +172,8 @@ fun RoomListScreen(session: MatrixSession, nav: Navigator) {
                             }
                         },
                         actions = {
-                            IconButton(onClick = { searching = true }) { Icon(Icons.Filled.Search, "Search") }
+                            IconButton(onClick = { searching = true }) { Icon(Icons.Filled.Search, "Filter chats") }
+                            IconButton(onClick = { nav.push(Screen.Search) }) { Icon(Icons.AutoMirrored.Filled.ManageSearch, "Search messages") }
                         },
                         scrollBehavior = scrollBehavior,
                     )
@@ -239,7 +244,9 @@ fun RoomListScreen(session: MatrixSession, nav: Navigator) {
                 if (room.isInvite) {
                     InviteRow(room, session)
                 } else {
-                    RoomRow(room, onClick = { nav.push(Screen.Room(room.id)) }, onLongClick = { actionsFor = room })
+                    SwipeableRoomRow(room, session) {
+                        RoomRow(room, onClick = { nav.push(Screen.Room(room.id)) }, onLongClick = { actionsFor = room })
+                    }
                 }
             }
             item(key = "bottom-space") { Spacer(Modifier.height(88.dp)) }
@@ -257,6 +264,7 @@ private fun RoomFilter.label() = when (this) {
     RoomFilter.GROUPS -> "Rooms"
     RoomFilter.FAVOURITES -> "Favourites"
     RoomFilter.INVITES -> "Invites"
+    RoomFilter.LOW_PRIORITY -> "Low priority"
 }
 
 @Composable
@@ -417,6 +425,16 @@ private fun RoomActionsSheet(room: RoomSummary, session: MatrixSession, onDismis
             modifier = Modifier.clickable { run { it.setIsFavourite(!room.isFavourite, null) } },
         )
         ListItem(
+            headlineContent = { Text(if (room.isLowPriority) "Move out of low priority" else "Low priority (archive)") },
+            leadingContent = { Icon(Icons.Filled.Archive, null) },
+            modifier = Modifier.clickable { run { it.setIsLowPriority(!room.isLowPriority, null) } },
+        )
+        ListItem(
+            headlineContent = { Text(if (room.isMuted) "Unmute" else "Mute") },
+            leadingContent = { Icon(Icons.Filled.NotificationsOff, null) },
+            modifier = Modifier.clickable { run { toggleMute(session, room) } },
+        )
+        ListItem(
             headlineContent = { Text("Leave") },
             leadingContent = { Icon(Icons.AutoMirrored.Filled.ExitToApp, null, tint = MaterialTheme.colorScheme.error) },
             modifier = Modifier.clickable { run { it.leave() } },
@@ -464,4 +482,77 @@ fun JoinRoomDialog(session: MatrixSession, onDismiss: () -> Unit, onJoined: (Str
         },
         dismissButton = { androidx.compose.material3.TextButton(onClick = onDismiss) { Text("Cancel") } },
     )
+}
+
+/** Swipe right: mark read/unread. Swipe left: mute/unmute. The row springs back after acting. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SwipeableRoomRow(room: RoomSummary, session: MatrixSession, content: @Composable () -> Unit) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val state = androidx.compose.material3.rememberSwipeToDismissBoxState()
+    androidx.compose.material3.SwipeToDismissBox(
+        state = state,
+        backgroundContent = {
+            val dir = state.dismissDirection
+            val toRead = dir == androidx.compose.material3.SwipeToDismissBoxValue.StartToEnd
+            Row(
+                Modifier.fillMaxSize().background(if (toRead) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.secondaryContainer)
+                    .padding(horizontal = 24.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = if (toRead) Arrangement.Start else Arrangement.End,
+            ) {
+                if (dir != androidx.compose.material3.SwipeToDismissBoxValue.Settled) {
+                    Icon(
+                        when {
+                            toRead && room.hasUnread -> Icons.Filled.MarkEmailRead
+                            toRead -> Icons.Filled.MarkChatUnread
+                            room.isMuted -> Icons.Filled.Notifications
+                            else -> Icons.Filled.NotificationsOff
+                        },
+                        null,
+                    )
+                    Text(
+                        when {
+                            toRead && room.hasUnread -> "  Read"
+                            toRead -> "  Unread"
+                            room.isMuted -> "  Unmute"
+                            else -> "  Mute"
+                        },
+                        style = MaterialTheme.typography.labelLarge,
+                    )
+                }
+            }
+        },
+        onDismiss = { value ->
+            scope.launch {
+                val r = session.client.getRoom(room.id)
+                runCatching {
+                    if (value == androidx.compose.material3.SwipeToDismissBoxValue.StartToEnd) {
+                        if (room.hasUnread) {
+                            r?.markAsRead(org.matrix.rustcomponents.sdk.ReceiptType.READ)
+                            r?.setUnreadFlag(false)
+                            context.graph.notifications.clearRoom(room.id)
+                        } else {
+                            r?.setUnreadFlag(true)
+                        }
+                    } else {
+                        toggleMute(session, room)
+                    }
+                }.onFailure { context.toast(errorMessage(it)) }
+                session.rooms.refresh(room.id)
+            }
+            scope.launch { state.reset() }
+        },
+    ) { Box(Modifier.background(MaterialTheme.colorScheme.surface)) { content() } }
+}
+
+private suspend fun toggleMute(session: MatrixSession, room: RoomSummary) {
+    val settings = session.client.getNotificationSettings()
+    if (room.isMuted) {
+        settings.unmuteRoom(room.id, room.isEncrypted, room.isDm)
+    } else {
+        settings.setRoomNotificationMode(room.id, org.matrix.rustcomponents.sdk.RoomNotificationMode.MUTE)
+    }
+    session.rooms.refresh(room.id)
 }

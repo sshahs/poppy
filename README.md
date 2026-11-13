@@ -56,13 +56,20 @@
 
 **Chats**
 - **Spaces**: switch between spaces from the chat list, browse a space's rooms and subspaces and join them
-- Room list with **unread / mentions / people / rooms / favourites / invites** filters and fuzzy search
+- Room list with **unread / people / rooms / favourites / invites / low priority** filters and fuzzy search
+- **Swipe actions**: swipe right to mark read/unread, left to mute/unmute; "Low priority" works as an archive
+- **Message search** across all rooms, including encrypted ones, from an encrypted on-device index
 - Accept or decline **invites** inline; mark read/unread, favourite and leave from a long-press
 - Timeline with **day dividers, unread marker, grouping, read ticks**, infinite back-pagination
 - **Markdown** composer (`/me`, `/shrug`, `/plain`), **replies** (incl. swipe-to-reply), **edits**, **redactions**
 - **Mentions**: `@` autocomplete for members and `@room`, intentional mentions, pills, and highlighted messages that mention you
 - **Voice messages**: record (Opus/Ogg) with a live waveform, inline playback with seekable waveform
-- **Reactions** (quick bar + emoji picker), **pinning**, copy/share/permalinks
+- **Reactions** (quick bar + emoji picker), copy/share/permalinks
+- **Threads**: per-room thread list and thread view with replies; threaded replies are kept out of the main timeline
+- **Pinned messages** bar (tap to jump and cycle, long-press to unpin)
+- **Jump to first unread**, jump to replied/searched messages (loads history as needed), collapsed join/leave runs
+- **Calls** via Element Call (MatrixRTC): voice/video, picture-in-picture, configurable Element Call URL
+- **Link previews** (opt-in, since your homeserver fetches the page)
 - **HTML formatted messages** via a compact native renderer (lists, quotes, code, colours, spoilers), linkified plain text, emoji-only jumbo messages, inline timestamps
 - **Images, stickers & GIFs** (animated), **video**, **audio**, **files**
 - **Media captions** (add while sending, edit later) and **galleries / albums** (send several photos as one message)
@@ -78,6 +85,7 @@
 - **Explore** public room directories on any server and join by alias/ID
 - Room info: encryption, per-room **notification mode**, favourite, members (with roles), invite, rename, topic, copy link
 - Member actions: message, remove, ban, ignore/unignore
+- **Devices**: see where you're signed in, rename and sign out devices (password confirmation, or your account page on OAuth servers)
 
 **Notifications**
 - UnifiedPush (Sunup, ntfy, …) with automatic **Matrix gateway discovery**
@@ -94,10 +102,7 @@
 
 Matrix is a big protocol and Poppy is young. Planned next, roughly in order:
 
-- [ ] Threads view (thread summaries are shown today)
-- [ ] Voice/video calls (Element Call / MatrixRTC)
-- [ ] Message search (the Rust SDK search index)
-- [ ] Device management list & sign out other sessions
+- [ ] Incoming call ringing screen
 - [ ] Map previews for locations, rich text editor
 - [ ] Multi-account switching (storage already supports several accounts)
 - [ ] Translations

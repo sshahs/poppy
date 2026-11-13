@@ -12,6 +12,11 @@
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
 
     <uses-feature android:name="android.hardware.microphone" android:required="false" />
     <uses-feature android:name="android.hardware.location" android:required="false" />
@@ -84,6 +89,22 @@
             android:name=".push.PollingJobService"
             android:exported="false"
             android:permission="android.permission.BIND_JOB_SERVICE" />
+
+        <activity
+            android:name=".ui.call.CallActivity"
+            android:exported="false"
+            android:launchMode="singleTask"
+            android:taskAffinity="io.github.sshahs.poppy.call"
+            android:excludeFromRecents="false"
+            android:supportsPictureInPicture="true"
+            android:resizeableActivity="true"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboard|keyboardHidden|navigation|density|uiMode"
+            android:theme="@style/Theme.Poppy" />
+
+        <service
+            android:name=".ui.call.CallService"
+            android:exported="false"
+            android:foregroundServiceType="microphone" />
 
         <service
             android:name=".core.location.LiveLocationService"

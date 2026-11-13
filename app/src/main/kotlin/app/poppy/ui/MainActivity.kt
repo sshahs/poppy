@@ -174,7 +174,11 @@ private fun MainContent(session: MatrixSession, nav: Navigator) {
         holder.SaveableStateProvider(screen.key) {
             when (screen) {
                 Screen.Rooms -> RoomListScreen(session, nav)
-                is Screen.Room -> RoomScreen(session, screen.roomId, nav)
+                is Screen.Room -> RoomScreen(session, screen.roomId, nav, focusEventId = screen.focusEventId)
+                is Screen.Thread -> RoomScreen(session, screen.roomId, nav, threadRootId = screen.rootEventId)
+                is Screen.Threads -> app.poppy.ui.room.ThreadsScreen(session, screen.roomId, nav)
+                Screen.Search -> app.poppy.ui.rooms.SearchScreen(session, nav)
+                Screen.Devices -> app.poppy.ui.settings.DevicesScreen(session, nav)
                 is Screen.RoomDetails -> RoomDetailsScreen(session, screen.roomId, nav)
                 is Screen.Members -> MembersScreen(session, screen.roomId, nav)
                 Screen.StartChat -> StartChatScreen(session, nav)

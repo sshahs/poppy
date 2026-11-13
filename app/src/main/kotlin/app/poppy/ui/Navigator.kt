@@ -11,6 +11,10 @@ sealed interface Screen {
 
     data object Rooms : Screen { override val key = "rooms" }
     data class Room(val roomId: String, val focusEventId: String? = null) : Screen { override val key = "room/$roomId" }
+    data class Thread(val roomId: String, val rootEventId: String) : Screen { override val key = "thread/$roomId/$rootEventId" }
+    data class Threads(val roomId: String) : Screen { override val key = "threads/$roomId" }
+    data object Search : Screen { override val key = "search" }
+    data object Devices : Screen { override val key = "devices" }
     data class RoomDetails(val roomId: String) : Screen { override val key = "details/$roomId" }
     data class Members(val roomId: String) : Screen { override val key = "members/$roomId" }
     data object StartChat : Screen { override val key = "start-chat" }

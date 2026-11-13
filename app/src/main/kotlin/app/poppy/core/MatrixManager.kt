@@ -88,6 +88,8 @@ class MatrixManager(
     private fun builder(dataPath: String, cachePath: String, passphrase: String): ClientBuilder =
         ClientBuilder()
             .sqliteStore(SqliteStoreBuilder(dataPath, cachePath).passphrase(passphrase))
+            // Encrypted, on-device full-text index for message search (incl. E2EE rooms).
+            .withSearchIndexStore(File(dataPath, "search-index").apply { mkdirs() }.absolutePath, passphrase)
             .slidingSyncVersionBuilder(SlidingSyncVersionBuilder.DISCOVER_NATIVE)
             .autoEnableCrossSigning(true)
             .autoEnableBackups(true)

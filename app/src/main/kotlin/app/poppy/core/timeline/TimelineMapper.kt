@@ -38,7 +38,17 @@ class TimelineMapper(private val ownUserId: String) {
         val content = e.content
         if (content !is TimelineItemContent.MsgLike) {
             val text = Formatter.stateText(content, senderName) ?: return null
-            return StateEntry(key, text, e.timestamp.toLong())
+            val kind = when (content) {
+                is TimelineItemContent.RoomMembership -> when (content.change) {
+                    org.matrix.rustcomponents.sdk.MembershipChange.JOINED,
+                    org.matrix.rustcomponents.sdk.MembershipChange.INVITATION_ACCEPTED -> StateKind.JOIN
+                    org.matrix.rustcomponents.sdk.MembershipChange.LEFT -> StateKind.LEAVE
+                    else -> StateKind.OTHER
+                }
+                is TimelineItemContent.ProfileChange -> StateKind.PROFILE
+                else -> StateKind.OTHER
+            }
+            return StateEntry(key, text, e.timestamp.toLong(), kind)
         }
         val msgLike = content.content
         var mentionsMe = false

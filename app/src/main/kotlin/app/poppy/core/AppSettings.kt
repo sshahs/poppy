@@ -23,6 +23,19 @@ class AppSettings(context: Context) {
     private val _sendTyping = MutableStateFlow(prefs.getBoolean(KEY_TYPING, true))
     val sendTyping: StateFlow<Boolean> = _sendTyping
 
+    private val _linkPreviews = MutableStateFlow(prefs.getBoolean(KEY_PREVIEWS, false))
+    /** Off by default: fetching a preview tells your homeserver which links you received. */
+    val linkPreviews: StateFlow<Boolean> = _linkPreviews
+
+    fun setLinkPreviews(enabled: Boolean) {
+        prefs.edit { putBoolean(KEY_PREVIEWS, enabled) }
+        _linkPreviews.value = enabled
+    }
+
+    var elementCallUrl: String
+        get() = prefs.getString(KEY_CALL_URL, DEFAULT_CALL_URL) ?: DEFAULT_CALL_URL
+        set(value) = prefs.edit { putString(KEY_CALL_URL, value.ifBlank { DEFAULT_CALL_URL }) }
+
     private val _sendReadReceipts = MutableStateFlow(prefs.getBoolean(KEY_RECEIPTS, true))
     val sendReadReceipts: StateFlow<Boolean> = _sendReadReceipts
 
@@ -77,5 +90,8 @@ class AppSettings(context: Context) {
         const val KEY_ENDPOINT = "push_endpoint"
         const val KEY_GATEWAY = "push_gateway"
         const val KEY_LAST_HS = "last_hs"
+        const val KEY_PREVIEWS = "link_previews"
+        const val KEY_CALL_URL = "element_call_url"
+        const val DEFAULT_CALL_URL = "https://call.element.io"
     }
 }

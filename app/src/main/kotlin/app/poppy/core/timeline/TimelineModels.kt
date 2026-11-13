@@ -18,8 +18,26 @@ data class ReadMarker(override val key: String) : TimelineEntry
 @Immutable
 data class TimelineStart(override val key: String) : TimelineEntry
 
+enum class StateKind { JOIN, LEAVE, PROFILE, OTHER }
+
 @Immutable
-data class StateEntry(override val key: String, val text: String, val timestamp: Long) : TimelineEntry
+data class StateEntry(override val key: String, val text: String, val timestamp: Long, val kind: StateKind = StateKind.OTHER) : TimelineEntry
+
+/** A run of membership/profile changes collapsed into one expandable line. */
+@Immutable
+data class StateGroup(override val key: String, val items: List<StateEntry>) : TimelineEntry {
+    val summary: String
+        get() {
+            val joins = items.count { it.kind == StateKind.JOIN }
+            val leaves = items.count { it.kind == StateKind.LEAVE }
+            val other = items.size - joins - leaves
+            return listOfNotNull(
+                joins.takeIf { it > 0 }?.let { "$it joined" },
+                leaves.takeIf { it > 0 }?.let { "$it left" },
+                other.takeIf { it > 0 }?.let { "$it other change" + if (it > 1) "s" else "" },
+            ).joinToString(", ")
+        }
+}
 
 @Immutable
 data class ReactionUi(val key: String, val count: Int, val mine: Boolean, val senders: List<String>)

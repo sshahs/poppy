@@ -45,6 +45,7 @@ import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -101,6 +102,12 @@ import app.poppy.core.timeline.ReadMarker
 import app.poppy.core.timeline.RoomTimeline
 import app.poppy.core.timeline.SendStatus
 import app.poppy.core.timeline.StateEntry
+import app.poppy.core.timeline.StateGroup
+import app.poppy.ui.call.CallActivity
+import androidx.compose.material.icons.automirrored.outlined.Chat
+import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.VideoCall
+import androidx.compose.material.icons.outlined.Videocam
 import app.poppy.core.timeline.TimelineStart
 import app.poppy.core.timeline.mediaCaption
 import app.poppy.graph
@@ -140,7 +147,7 @@ private data class RoomHeader(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun RoomScreen(session: MatrixSession, roomId: String, nav: Navigator) {
+fun RoomScreen(session: MatrixSession, roomId: String, nav: Navigator, threadRootId: String? = null, focusEventId: String? = null) {
     val context = LocalContext.current
     val g = context.graph
     val room: Room? = remember(roomId) { session.client.getRoom(roomId) }
@@ -153,21 +160,34 @@ fun RoomScreen(session: MatrixSession, roomId: String, nav: Navigator) {
         return
     }
 
-    val timeline = remember(roomId) { RoomTimeline(room, session.userId) { !g.settings.sendReadReceipts.value } }
+    val timeline = remember(roomId, threadRootId) { RoomTimeline(room, session.userId, threadRootId) { !g.settings.sendReadReceipts.value } }
+    var pinned by remember(roomId) { mutableStateOf<List<String>>(emptyList()) }
+    var hasCall by remember(roomId) { mutableStateOf(false) }
     var header by remember(roomId) {
         mutableStateOf(RoomHeader(room.displayName() ?: roomId, room.avatarUrl(), room.joinedMembersCount().toLong(), false, false, room.topic()))
     }
 
     DisposableEffect(roomId) {
         timeline.open()
-        g.visibleRoomId = roomId
-        g.notifications.clearRoom(roomId)
+        if (threadRootId == null) {
+            g.visibleRoomId = roomId
+            g.notifications.clearRoom(roomId)
+        }
         val infoHandle = room.subscribeToRoomInfoUpdates(object : RoomInfoListener {
             override fun call(roomInfo: RoomInfo) {
                 header = roomInfo.toHeader(roomId)
+                pinned = roomInfo.pinnedEventIds
+                hasCall = roomInfo.hasRoomCall
             }
         })
-        g.scope.launch { runCatching { header = room.roomInfo().toHeader(roomId) } }
+        g.scope.launch {
+            runCatching {
+                val info = room.roomInfo()
+                header = info.toHeader(roomId)
+                pinned = info.pinnedEventIds
+                hasCall = info.hasRoomCall
+            }
+        }
         onDispose {
             if (g.visibleRoomId == roomId) g.visibleRoomId = null
             infoHandle.cancel()
@@ -183,6 +203,27 @@ fun RoomScreen(session: MatrixSession, roomId: String, nav: Navigator) {
     val reversed = remember(entries) { entries.asReversed() }
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
+    var highlightKey by remember { mutableStateOf<String?>(null) }
+
+    /** Scrolls to an event, loading older history if needed, and flashes it. */
+    fun jumpTo(eventId: String) {
+        scope.launch {
+            if (!timeline.ensureLoaded(eventId)) {
+                context.toast("Couldn't find that message")
+                return@launch
+            }
+            delay(50)
+            val list = timeline.entries.value.asReversed()
+            val idx = list.indexOfFirst { (it as? MessageEntry)?.eventId == eventId }
+            if (idx >= 0) {
+                listState.animateScrollToItem(idx, -200)
+                highlightKey = list[idx].key
+                delay(1600)
+                highlightKey = null
+            }
+        }
+    }
+    LaunchedEffect(focusEventId) { focusEventId?.let { delay(400); jumpTo(it) } }
 
     var composer by remember(roomId) { mutableStateOf(TextFieldValue("")) }
     var replyTo by remember(roomId) { mutableStateOf<MessageEntry?>(null) }
@@ -394,8 +435,9 @@ fun RoomScreen(session: MatrixSession, roomId: String, nav: Navigator) {
                     ) {
                         Avatar(header.avatar, header.name, roomId, 38.dp)
                         Column(Modifier.padding(start = 12.dp)) {
-                            Text(header.name, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text(if (threadRootId != null) "Thread" else header.name, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             val subtitle = when {
+                                threadRootId != null -> header.name
                                 typing.isNotEmpty() -> typingText(typing)
                                 header.isDm -> if (header.encrypted) "Encrypted" else "Direct message"
                                 else -> "${header.members} members"
@@ -413,6 +455,18 @@ fun RoomScreen(session: MatrixSession, roomId: String, nav: Navigator) {
                     }
                 },
                 navigationIcon = { IconButton(onClick = { nav.pop() }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") } },
+                actions = {
+                    if (threadRootId == null) {
+                        IconButton(onClick = { CallActivity.start(context, roomId) }) {
+                            Icon(
+                                if (hasCall) Icons.Filled.VideoCall else Icons.Outlined.Videocam,
+                                if (hasCall) "Join call" else "Start call",
+                                tint = if (hasCall) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        IconButton(onClick = { nav.push(Screen.Threads(roomId)) }) { Icon(Icons.AutoMirrored.Outlined.Chat, "Threads") }
+                    }
+                },
             )
         },
         bottomBar = {
@@ -504,20 +558,42 @@ fun RoomScreen(session: MatrixSession, roomId: String, nav: Navigator) {
                             onVote = { answer -> e.eventId?.let { timeline.vote(it, answer) } },
                             onEndPoll = { e.eventId?.let { timeline.endPoll(it) } },
                             onRetry = { timeline.retry(e.id) },
-                            onJumpToReply = { eventId ->
-                                val idx = reversed.indexOfFirst { (it as? MessageEntry)?.eventId == eventId }
-                                if (idx >= 0) scope.launch { listState.animateScrollToItem(idx) }
-                            },
+                            onJumpToReply = { eventId -> jumpTo(eventId) },
+                            onOpenThread = if (threadRootId == null) { { e.eventId?.let { nav.push(Screen.Thread(roomId, it)) } } } else null,
+                            highlighted = highlightKey == e.key,
                         )
                         is DayDivider -> DayRow(e.timestamp)
                         is ReadMarker -> if (i > 0) NewMessagesRow() else Spacer(Modifier.height(0.dp))
                         is StateEntry -> StateRow(e.text)
+                        is StateGroup -> StateGroupRow(e)
                         is TimelineStart -> StartRow(header.name)
                     }
                 }
                 if (paginating) item(key = "loading") {
                     Box(Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
                         CircularProgressIndicator(Modifier.size(24.dp), strokeWidth = 2.dp)
+                    }
+                }
+            }
+            Column(Modifier.align(Alignment.TopCenter).fillMaxWidth()) {
+                if (threadRootId == null && pinned.isNotEmpty()) {
+                    PinnedBar(room, pinned, onJump = ::jumpTo, onUnpin = { timeline.unpin(it) })
+                }
+                // "Jump to first unread" when the read marker is above what's on screen.
+                val markerIdx = reversed.indexOfFirst { it is ReadMarker }
+                val lastVisible = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
+                AnimatedVisibility(markerIdx > 0 && markerIdx > lastVisible, Modifier.align(Alignment.CenterHorizontally)) {
+                    Surface(
+                        onClick = { scope.launch { listState.animateScrollToItem(markerIdx, -120) } },
+                        shape = RoundedCornerShape(16.dp),
+                        color = MaterialTheme.colorScheme.primaryContainer,
+                        tonalElevation = 3.dp,
+                        modifier = Modifier.padding(top = 6.dp),
+                    ) {
+                        Row(Modifier.padding(horizontal = 12.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Filled.KeyboardArrowUp, null, Modifier.size(16.dp))
+                            Text(" Jump to first unread", style = MaterialTheme.typography.labelLarge)
+                        }
                     }
                 }
             }
@@ -567,7 +643,8 @@ fun RoomScreen(session: MatrixSession, roomId: String, nav: Navigator) {
                 context.toast("Copied")
             },
             onShare = { context.shareText(e.body.mediaCaption ?: e.body.plain) },
-            onPin = { e.eventId?.let { timeline.pin(it) } },
+            isPinned = e.eventId != null && e.eventId in pinned,
+            onPin = { e.eventId?.let { if (it in pinned) timeline.unpin(it) else timeline.pin(it) } },
             onRedact = { confirmRedact = e },
             onRetry = { timeline.retry(e.id) },
             onCancelSend = { timeline.abort(e.id) },
@@ -657,6 +734,8 @@ private fun MessageRow(
     onEndPoll: () -> Unit,
     onRetry: () -> Unit,
     onJumpToReply: (String) -> Unit,
+    onOpenThread: (() -> Unit)?,
+    highlighted: Boolean,
 ) {
     val context = LocalContext.current
     val haptics = LocalHapticFeedback.current
@@ -691,6 +770,7 @@ private fun MessageRow(
     Column(
         Modifier
             .fillMaxWidth()
+            .background(if (highlighted) scheme.primary.copy(alpha = 0.12f) else Color.Transparent, RoundedCornerShape(12.dp))
             .padding(top = if (entry.groupedWithPrevious) 2.dp else 6.dp)
             .pointerInput(entry.key) {
                 detectHorizontalDragGestures(
@@ -761,12 +841,17 @@ private fun MessageRow(
                 }
             }
         }
-        if (entry.threadReplies > 0) {
+        if (entry.threadReplies > 0 && onOpenThread != null) {
             Text(
-                "${entry.threadReplies} ${if (entry.threadReplies == 1) "reply" else "replies"} in thread",
+                "${entry.threadReplies} ${if (entry.threadReplies == 1) "reply" else "replies"} in thread ›",
                 style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.SemiBold,
                 color = scheme.primary,
-                modifier = Modifier.padding(start = if (own) 0.dp else 46.dp, top = 2.dp),
+                modifier = Modifier
+                    .padding(start = if (own) 0.dp else 40.dp, top = 2.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .clickable(onClick = onOpenThread)
+                    .padding(horizontal = 6.dp, vertical = 3.dp),
             )
         }
         if (entry.reactions.isNotEmpty()) {
@@ -856,5 +941,72 @@ private fun StartRow(name: String) {
     Column(Modifier.fillMaxWidth().padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
         Text("This is the beginning of", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Text(name, style = MaterialTheme.typography.titleMedium)
+    }
+}
+
+@Composable
+private fun StateGroupRow(group: StateGroup) {
+    var expanded by remember(group.key) { mutableStateOf(false) }
+    Column(Modifier.fillMaxWidth().padding(vertical = 2.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(
+            group.summary + if (expanded) "  ▴" else "  ▾",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.clip(RoundedCornerShape(10.dp)).clickable { expanded = !expanded }.padding(horizontal = 10.dp, vertical = 4.dp),
+        )
+        if (expanded) group.items.forEach { StateRow(it.text) }
+    }
+}
+
+/** Pinned messages: shows one at a time; tap jumps to it and advances, long-press unpins. */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun PinnedBar(room: Room, pinned: List<String>, onJump: (String) -> Unit, onUnpin: (String) -> Unit) {
+    var index by remember(pinned) { mutableStateOf(pinned.lastIndex) }
+    val eventId = pinned.getOrNull(index.coerceIn(0, pinned.lastIndex)) ?: return
+    var text by remember(eventId) { mutableStateOf<String?>(null) }
+    LaunchedEffect(eventId) {
+        text = runCatching {
+            when (val c = room.loadOrFetchEvent(eventId).content()) {
+                is org.matrix.rustcomponents.sdk.TimelineEventContent.MessageLike -> when (val m = c.content) {
+                    is org.matrix.rustcomponents.sdk.MessageLikeEventContent.RoomMessage -> app.poppy.core.Formatter.stripReplyFallback(app.poppy.core.Formatter.messageBody(m.messageType))
+                    is org.matrix.rustcomponents.sdk.MessageLikeEventContent.Poll -> "\uD83D\uDCCA ${m.question}"
+                    else -> "Pinned message"
+                }
+                else -> "Pinned message"
+            }
+        }.getOrDefault("Pinned message")
+    }
+    var confirm by remember { mutableStateOf(false) }
+    Surface(tonalElevation = 3.dp, shadowElevation = 1.dp) {
+        Row(
+            Modifier.fillMaxWidth().combinedClickable(
+                onClick = {
+                    onJump(eventId)
+                    index = if (index <= 0) pinned.lastIndex else index - 1
+                },
+                onLongClick = { confirm = true },
+            ).padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(Modifier.width(3.dp).height(32.dp).background(MaterialTheme.colorScheme.primary, RoundedCornerShape(2.dp)))
+            Column(Modifier.weight(1f).padding(start = 10.dp)) {
+                Text(
+                    if (pinned.size > 1) "Pinned message ${pinned.size - index.coerceIn(0, pinned.lastIndex)} of ${pinned.size}" else "Pinned message",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+                Text(text ?: "…", style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+            Icon(Icons.Filled.PushPin, null, Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+    if (confirm) {
+        AlertDialog(
+            onDismissRequest = { confirm = false },
+            title = { Text("Unpin message?") },
+            confirmButton = { TextButton(onClick = { confirm = false; onUnpin(eventId) }) { Text("Unpin") } },
+            dismissButton = { TextButton(onClick = { confirm = false }) { Text("Cancel") } },
+        )
     }
 }

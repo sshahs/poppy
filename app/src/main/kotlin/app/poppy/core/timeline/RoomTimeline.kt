@@ -41,7 +41,13 @@ import uniffi.matrix_sdk_ui.TimelineReadReceiptTracking
 import org.matrix.rustcomponents.sdk.PaginationStatusListener
 
 /** A live, paginating view of one room's timeline. */
-class RoomTimeline(val room: Room, ownUserId: String, private val privateReceipts: () -> Boolean) {
+class RoomTimeline(
+    val room: Room,
+    ownUserId: String,
+    /** When set, this is a thread timeline rooted at this event; sends go into the thread. */
+    val threadRootId: String? = null,
+    private val privateReceipts: () -> Boolean,
+) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val mapper = TimelineMapper(ownUserId)
 
@@ -71,7 +77,7 @@ class RoomTimeline(val room: Room, ownUserId: String, private val privateReceipt
             try {
                 val tl = room.timelineWithConfiguration(
                     TimelineConfiguration(
-                        focus = TimelineFocus.Live(hideThreadedEvents = false),
+                        focus = threadRootId?.let { TimelineFocus.Thread(it) } ?: TimelineFocus.Live(hideThreadedEvents = true),
                         filter = TimelineFilter.All,
                         internalIdPrefix = null,
                         dateDividerMode = DateDividerMode.DAILY,
@@ -156,25 +162,44 @@ class RoomTimeline(val room: Room, ownUserId: String, private val privateReceipt
         null
     }
 
-    /** Computes sender grouping in a single pass, then publishes an immutable snapshot. */
+    /**
+     * Single pass over the raw items: computes sender grouping for bubbles and collapses runs of
+     * 3+ membership/profile changes into one [StateGroup], then publishes an immutable snapshot.
+     */
     private fun publish() {
         val out = ArrayList<TimelineEntry>(items.size)
         var prev: MessageEntry? = null
+        var prevIdx = -1
+        val run = ArrayList<StateEntry>()
+        fun flushRun() {
+            if (run.size >= MEMBERSHIP_GROUP_MIN) out += StateGroup("group-" + run.first().key, run.toList()) else out.addAll(run)
+            run.clear()
+        }
         for (raw in items) {
             val e = raw ?: continue
+            if (e is StateEntry && e.kind != StateKind.OTHER) {
+                run += e
+                prev = null
+                continue
+            }
+            flushRun()
             if (e is MessageEntry) {
                 val grouped = prev != null && prev.senderId == e.senderId && e.timestamp - prev.timestamp < GROUP_WINDOW_MS
-                if (grouped && out.isNotEmpty()) {
-                    val lastIdx = out.lastIndex
-                    out[lastIdx] = (out[lastIdx] as MessageEntry).copy(groupedWithNext = true)
+                if (grouped && prevIdx >= 0) {
+                    out[prevIdx] = (out[prevIdx] as MessageEntry).copy(groupedWithNext = true)
                 }
+                prevIdx = out.size
                 out += if (grouped) e.copy(groupedWithPrevious = true) else e
                 prev = e
             } else {
-                if (e !is ReadMarker) prev = null
+                if (e !is ReadMarker) {
+                    prev = null
+                    prevIdx = -1
+                }
                 out += e
             }
         }
+        flushRun()
         _entries.value = out
     }
 
@@ -294,6 +319,19 @@ class RoomTimeline(val room: Room, ownUserId: String, private val privateReceipt
 
     fun pin(eventId: String) = launchCatching { timeline?.pinEvent(eventId) }
 
+    fun unpin(eventId: String) = launchCatching { timeline?.unpinEvent(eventId) }
+
+    /** Loads older history until [eventId] is in [entries] (or the start is reached). */
+    suspend fun ensureLoaded(eventId: String, maxPages: Int = 40): Boolean {
+        repeat(maxPages) {
+            if (_entries.value.any { (it as? MessageEntry)?.eventId == eventId }) return true
+            if (_atStart.value) return false
+            runCatching { timeline?.paginateBackwards(PAGE) }
+            kotlinx.coroutines.delay(150)
+        }
+        return _entries.value.any { (it as? MessageEntry)?.eventId == eventId }
+    }
+
     fun markAsRead() = launchCatching {
         timeline?.markAsRead(if (privateReceipts()) ReceiptType.READ_PRIVATE else ReceiptType.READ)
     }
@@ -327,5 +365,6 @@ class RoomTimeline(val room: Room, ownUserId: String, private val privateReceipt
         const val TAG = "RoomTimeline"
         const val PAGE: UShort = 50u
         const val GROUP_WINDOW_MS = 5 * 60 * 1000L
+        const val MEMBERSHIP_GROUP_MIN = 3
     }
 }

@@ -28,6 +28,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Code
+import androidx.compose.material.icons.filled.Devices
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.Notifications
@@ -284,6 +285,12 @@ fun SecurityScreen(session: MatrixSession, nav: Navigator) {
             }
         }
         ListItem(headlineContent = { Text("Device ID") }, supportingContent = { Text(session.deviceId, fontFamily = FontFamily.Monospace) })
+        ListItem(
+            headlineContent = { Text("Your devices") },
+            supportingContent = { Text("See where you're signed in, rename or sign out devices") },
+            leadingContent = { Icon(Icons.Filled.Devices, null) },
+            modifier = Modifier.clickable { nav.push(Screen.Devices) },
+        )
         fingerprint?.let { fp ->
             ListItem(
                 headlineContent = { Text("Session key") },
@@ -673,6 +680,8 @@ fun AppearanceScreen(nav: Navigator) {
     val amoled by g.settings.amoled.collectAsState()
     val typing by g.settings.sendTyping.collectAsState()
     val receipts by g.settings.sendReadReceipts.collectAsState()
+    val previews by g.settings.linkPreviews.collectAsState()
+    var callUrl by remember { mutableStateOf(g.settings.elementCallUrl) }
     SettingsScaffold("Appearance & privacy", nav) {
         Section("Theme")
         ThemeMode.entries.forEach { m ->
@@ -700,9 +709,23 @@ fun AppearanceScreen(nav: Navigator) {
             trailingContent = { Switch(typing, g.settings::setSendTyping) },
         )
         ListItem(
+            headlineContent = { Text("Link previews") },
+            supportingContent = { Text("Show a card for links in messages. Your homeserver fetches the page, so it learns which links you open.") },
+            trailingContent = { Switch(previews, g.settings::setLinkPreviews) },
+        )
+        ListItem(
             headlineContent = { Text("Send read receipts") },
             supportingContent = { Text("When off, receipts are private and only sync between your devices") },
             trailingContent = { Switch(receipts, g.settings::setSendReadReceipts) },
+        )
+        Section("Calls")
+        OutlinedTextField(
+            callUrl,
+            { callUrl = it; g.settings.elementCallUrl = it.trim() },
+            label = { Text("Element Call URL") },
+            supportingText = { Text("Calls use Element Call. Change this if your server hosts its own.") },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
         )
     }
 }

@@ -86,6 +86,7 @@ fun MessageActionsSheet(
     onEditCaption: () -> Unit,
     onCopy: () -> Unit,
     onShare: () -> Unit,
+    isPinned: Boolean,
     onPin: () -> Unit,
     onRedact: () -> Unit,
     onRetry: () -> Unit,
@@ -130,7 +131,7 @@ fun MessageActionsSheet(
         if (isContent) ActionItem("Share", Icons.Filled.Share) { act(onShare) }
         if (entry.eventId != null) {
             ActionItem("Copy link", Icons.Filled.Link) { act(onCopyLink) }
-            ActionItem("Pin", Icons.Filled.PushPin) { act(onPin) }
+            ActionItem(if (isPinned) "Unpin" else "Pin", Icons.Filled.PushPin) { act(onPin) }
         }
         if (entry.body !is MessageBody.Redacted && entry.eventId != null) {
             ActionItem("Remove", Icons.Outlined.DeleteOutline, MaterialTheme.colorScheme.error) { act(onRedact) }

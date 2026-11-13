@@ -111,9 +111,16 @@ class MatrixSession(
         scope.launch { runCatching { verification.attach() }.onFailure { Log.w(TAG, "verification", it) } }
     }
 
+    private var searchBackfill: TaskHandle? = null
+
     suspend fun startSync() {
         init()
         runCatching { syncService?.start() }.onFailure { Log.w(TAG, "sync start", it) }
+        // Index older encrypted history in the background so search covers it.
+        if (searchBackfill == null) {
+            searchBackfill = runCatching { client.runSearchBackfill(uniffi.matrix_sdk.SearchBackfillStrategy.BACKGROUND) }
+                .onFailure { Log.w(TAG, "search backfill", it) }.getOrNull()
+        }
     }
 
     suspend fun stopSync() {
@@ -137,6 +144,7 @@ class MatrixSession(
     fun close() {
         handles.forEach { runCatching { it.cancel() } }
         handles.clear()
+        searchBackfill?.cancel()
         rooms.close()
         spaces.close()
         verification.close()

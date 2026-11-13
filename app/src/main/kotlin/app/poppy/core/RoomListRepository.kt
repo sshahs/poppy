@@ -53,7 +53,7 @@ data class RoomSummary(
     val hasUnread: Boolean get() = isMarkedUnread || unreadNotifications > 0 || unreadMessages > 0
 }
 
-enum class RoomFilter { ALL, UNREAD, PEOPLE, GROUPS, FAVOURITES, INVITES }
+enum class RoomFilter { ALL, UNREAD, PEOPLE, GROUPS, FAVOURITES, INVITES, LOW_PRIORITY }
 
 /**
  * Drives the room list from sliding sync. Diffs from Rust are applied sequentially on a
@@ -140,7 +140,9 @@ class RoomListRepository(private val scope: CoroutineScope) {
             RoomListEntriesDynamicFilterKind.DeduplicateVersions,
         )
         when (_filter.value) {
-            RoomFilter.ALL -> Unit
+            // "Low priority" works as an archive: hidden from All, shown under its own filter.
+            RoomFilter.ALL -> base += RoomListEntriesDynamicFilterKind.NonLowPriority
+            RoomFilter.LOW_PRIORITY -> base += RoomListEntriesDynamicFilterKind.LowPriority
             RoomFilter.UNREAD -> base += RoomListEntriesDynamicFilterKind.ReadReceipts(RoomListFilterReadReceipts.NOTIFICATIONS)
             RoomFilter.PEOPLE -> base += RoomListEntriesDynamicFilterKind.Category(RoomListFilterCategory.PEOPLE)
             RoomFilter.GROUPS -> base += RoomListEntriesDynamicFilterKind.Category(RoomListFilterCategory.GROUP)

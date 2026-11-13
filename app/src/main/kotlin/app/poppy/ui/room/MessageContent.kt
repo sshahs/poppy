@@ -526,7 +526,10 @@ fun MessageBodyView(
     onEndPoll: () -> Unit,
 ) {
     when (body) {
-        is MessageBody.Text -> TextContent(body, color, linkColor, ownUserId, trailing)
+        is MessageBody.Text -> Column {
+            LinkPreviewCard(body.plain, color)
+            TextContent(body, color, linkColor, ownUserId, trailing)
+        }
         is MessageBody.Image -> Column {
             ImageContent(body) { onOpenImage(body.source, body.filename, body.mimeType) }
             body.caption?.let { Box(Modifier.padding(top = 6.dp)) { CaptionText(it, color, trailing) } }

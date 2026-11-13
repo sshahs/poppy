@@ -19,3 +19,8 @@
     public static int v(...);
     public static int d(...);
 }
+
+# --- Calls: the Element Call bridge is invoked from JavaScript ---
+-keepclassmembers class * {
+    @android.webkit.JavascriptInterface <methods>;
+}

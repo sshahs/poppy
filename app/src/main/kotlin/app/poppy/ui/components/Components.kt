@@ -14,6 +14,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -48,31 +51,42 @@ private fun String.codePointAtOrNull(i: Int): Int? = if (isEmpty()) null else co
 /** Circular avatar: Matrix thumbnail if available, coloured initial otherwise. */
 @Composable
 fun Avatar(url: String?, name: String, id: String, size: Dp, modifier: Modifier = Modifier) {
+    AvatarImage(url, name, id, size, CircleShape, modifier)
+}
+
+/**
+ * Avatar with a fallback that never shows behind a real image: the coloured initial is only drawn
+ * when there is no avatar or it fails to load, so transparent PNG avatars render as intended.
+ */
+@Composable
+fun AvatarImage(url: String?, name: String, id: String, size: Dp, shape: androidx.compose.ui.graphics.Shape, modifier: Modifier = Modifier) {
     val px = with(androidx.compose.ui.platform.LocalDensity.current) { size.roundToPx() }
     val request = remember(url, px) { MediaRequest.avatar(url, px.coerceIn(48, 320)) }
-    Box(
-        modifier
-            .size(size)
-            .clip(CircleShape)
-            .background(avatarColor(id)),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(
-            initialOf(name),
-            color = Color.White,
-            fontWeight = FontWeight.SemiBold,
-            fontSize = (size.value * 0.42f).sp,
-        )
+    // NONE: no avatar / failed → initial. LOADING: neutral placeholder. LOADED: image only.
+    var state by remember(request) { mutableStateOf(if (request == null) AvatarState.NONE else AvatarState.LOADING) }
+    val background = when (state) {
+        AvatarState.NONE -> avatarColor(id)
+        AvatarState.LOADING -> MaterialTheme.colorScheme.surfaceVariant
+        AvatarState.LOADED -> Color.Transparent
+    }
+    Box(modifier.size(size).clip(shape).background(background), contentAlignment = Alignment.Center) {
+        if (state == AvatarState.NONE) {
+            Text(initialOf(name), color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = (size.value * 0.42f).sp)
+        }
         if (request != null) {
             AsyncImage(
                 model = request,
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
+                onSuccess = { state = AvatarState.LOADED },
+                onError = { state = AvatarState.NONE },
                 modifier = Modifier.fillMaxSize(),
             )
         }
     }
 }
+
+private enum class AvatarState { NONE, LOADING, LOADED }
 
 @Composable
 fun EmptyState(title: String, body: String, modifier: Modifier = Modifier, content: @Composable () -> Unit = {}) {

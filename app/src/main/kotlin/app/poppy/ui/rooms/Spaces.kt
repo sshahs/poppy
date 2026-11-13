@@ -74,17 +74,11 @@ import uniffi.matrix_sdk_ui.SpaceRoomListPaginationState
 /** Rounded-square avatar used for spaces (circles are for people and rooms). */
 @Composable
 fun SpaceAvatar(url: String?, name: String, id: String, size: Dp, selected: Boolean = false) {
-    val px = with(LocalDensity.current) { size.roundToPx() }
-    val req = remember(url, px) { MediaRequest.avatar(url, px.coerceIn(48, 320)) }
     val shape = RoundedCornerShape(size / 4)
-    Box(
-        Modifier.size(size).clip(shape).background(avatarColor(id))
-            .then(if (selected) Modifier.border(2.dp, MaterialTheme.colorScheme.primary, shape) else Modifier),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(initialOf(name), color = Color.White, fontWeight = FontWeight.SemiBold)
-        if (req != null) AsyncImage(req, null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
-    }
+    app.poppy.ui.components.AvatarImage(
+        url, name, id, size, shape,
+        if (selected) Modifier.border(2.dp, MaterialTheme.colorScheme.primary, shape) else Modifier,
+    )
 }
 
 /** Horizontal space switcher shown above the chat list. */
